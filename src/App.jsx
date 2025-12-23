@@ -60,18 +60,26 @@ const App = () => {
   const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
+    console.log("🔥 [Firebase Debug] Starting initialization...");
     let firebaseConfig = null;
 
     // --- CONFIGURATION ---
     
     // 1. FOR PREVIEW (Active): Uses global config.
     if (typeof __firebase_config !== 'undefined') {
-      firebaseConfig = JSON.parse(__firebase_config);
-    }
+      console.log("🔥 [Firebase Debug] Found global __firebase_config");
+      try {
+        firebaseConfig = JSON.parse(__firebase_config);
+        console.log("🔥 [Firebase Debug] Config parsed successfully:", firebaseConfig.projectId);
+      } catch (e) {
+        console.error("🔥 [Firebase Debug] Failed to parse global config:", e);
+      }
+    } 
     
     // 2. FOR VERCEL DEPLOYMENT: Uncomment the lines below when deploying to Vercel
-    
+    /*
     else if (import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
+      console.log("🔥 [Firebase Debug] Found Vite environment variables");
       firebaseConfig = {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
         authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -81,44 +89,57 @@ const App = () => {
         appId: import.meta.env.VITE_FIREBASE_APP_ID
       };
     }
-    
+    */
 
     if (!firebaseConfig) {
-      console.warn("No Firebase configuration found. Starting in Demo Mode.");
+      console.warn("🔥 [Firebase Debug] No configuration found. Entering Demo Mode.");
       setIsDemoMode(true);
       return;
     }
 
     try {
       const app = initializeApp(firebaseConfig);
+      console.log("🔥 [Firebase Debug] App initialized");
+      
       const auth = getAuth(app);
       const firestore = getFirestore(app);
       setDb(firestore);
       
       // Use standard App ID if in Vercel, or global if in Canvas
       const id = (typeof __app_id !== 'undefined') ? __app_id : 'nimisha-portfolio-prod';
-      setAppId(id.replace(/[^a-zA-Z0-9_-]/g, '_'));
+      const sanitizedId = id.replace(/[^a-zA-Z0-9_-]/g, '_');
+      setAppId(sanitizedId);
+      console.log("🔥 [Firebase Debug] App ID set to:", sanitizedId);
 
       const initAuth = async () => {
         try {
           if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            console.log("🔥 [Firebase Debug] Attempting sign-in with custom token...");
             await signInWithCustomToken(auth, __initial_auth_token);
           } else {
+            console.log("🔥 [Firebase Debug] Attempting anonymous sign-in...");
             await signInAnonymously(auth);
           }
+          console.log("🔥 [Firebase Debug] Sign-in call completed.");
         } catch (e) {
-          console.error("Auth failed:", e);
+          console.error("🔥 [Firebase Debug] Auth failed:", e);
           setIsDemoMode(true);
         }
       };
       initAuth();
 
       const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
-        setUser(u);
+        if (u) {
+            console.log("🔥 [Firebase Debug] User authenticated:", u.uid);
+            setUser(u);
+        } else {
+            console.log("🔥 [Firebase Debug] User signed out.");
+            setUser(null);
+        }
       });
       return () => unsubscribeAuth();
     } catch (err) {
-      console.error("Firebase Init Error:", err);
+      console.error("🔥 [Firebase Debug] Init Critical Error:", err);
       setIsDemoMode(true);
     }
   }, []);
@@ -126,6 +147,7 @@ const App = () => {
   // Fetch Testimonials
   useEffect(() => {
     if (isDemoMode) {
+      console.log("🔥 [Firebase Debug] Using Demo Data");
       setReviews([
         { id: '1', name: 'Priya S.', text: 'Nimisha helped me navigate my anxiety during exams. Highly recommended!', rating: 5, createdAt: { seconds: 1700000000 } },
         { id: '2', name: 'Anonymous', text: 'A very supportive and understanding psychologist.', rating: 4, createdAt: { seconds: 1690000000 } }
@@ -136,6 +158,7 @@ const App = () => {
     if (!user || !db || !appId) return;
 
     try {
+      console.log("🔥 [Firebase Debug] Setting up Firestore listener...");
       let collectionRef;
       if (typeof __app_id !== 'undefined') {
          collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'testimonials');
@@ -146,16 +169,17 @@ const App = () => {
       const q = query(collectionRef, orderBy('createdAt', 'desc'));
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
+        console.log(`🔥 [Firebase Debug] Snapshot received. Docs: ${snapshot.docs.length}`);
         const fetchedReviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setReviews(fetchedReviews);
       }, (error) => {
-        console.error("Error fetching reviews:", error);
+        console.error("🔥 [Firebase Debug] Error fetching reviews:", error);
         // Fallback only on explicit error
         if (reviews.length === 0) setIsDemoMode(true);
       });
       return () => unsubscribe();
     } catch (e) {
-      console.error("Query failed:", e);
+      console.error("🔥 [Firebase Debug] Query failed:", e);
       setIsDemoMode(true);
     }
   }, [user, db, appId, isDemoMode]);
