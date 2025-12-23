@@ -58,15 +58,42 @@ const App = () => {
   const [db, setDb] = useState(null);
   const [appId, setAppId] = useState(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
+    console.log("🔥 [Firebase Debug] Starting initialization...");
     let firebaseConfig = null;
 
     // --- CONFIGURATION ---
+    
+    // 1. FOR PREVIEW (Active): Uses global config.
     if (typeof __firebase_config !== 'undefined') {
-      firebaseConfig = JSON.parse(__firebase_config);
-    } else {
+      console.log("🔥 [Firebase Debug] Found global __firebase_config");
+      try {
+        firebaseConfig = JSON.parse(__firebase_config);
+      } catch (e) {
+        console.error("🔥 [Firebase Debug] Failed to parse global config:", e);
+      }
+    } 
+    
+    // 2. FOR VERCEL DEPLOYMENT: Uncomment the lines below when deploying to Vercel
+
+    else if (import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
+      console.log("🔥 [Firebase Debug] Found Vite environment variables");
+      firebaseConfig = {
+        apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: import.meta.env.VITE_FIREBASE_APP_ID
+      };
+    }
+
+    if (!firebaseConfig) {
+      console.warn("🔥 [Firebase Debug] No configuration found. Entering Demo Mode.");
       setIsDemoMode(true);
+      setIsInitializing(false);
       return;
     }
 
@@ -76,39 +103,52 @@ const App = () => {
       const firestore = getFirestore(app);
       setDb(firestore);
       
-      // Sanitization: Remove slashes to ensure valid Firestore path segments
-      // This prevents the "6 segments" error while still attempting to use the ID
+      // Use standard App ID if in Vercel, or global if in Canvas
       const rawId = typeof __app_id !== 'undefined' ? __app_id : 'nimisha-portfolio-prod';
-      const sanitizedId = rawId.replace(/\//g, '_');
+      // Encode ID to be safe for URL segments (handles slashes/special chars)
+      const sanitizedId = encodeURIComponent(rawId);
       setAppId(sanitizedId);
+      console.log("🔥 [Firebase Debug] App ID set to:", sanitizedId);
 
       const initAuth = async () => {
         try {
           if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            console.log("🔥 [Firebase Debug] Attempting sign-in with custom token...");
             await signInWithCustomToken(auth, __initial_auth_token);
           } else {
+            console.log("🔥 [Firebase Debug] Attempting anonymous sign-in...");
             await signInAnonymously(auth);
           }
         } catch (e) {
-          console.warn("Auth failed, switching to demo mode:", e);
+          console.warn("🔥 [Firebase Debug] Auth failed, switching to demo mode:", e);
           setIsDemoMode(true);
+          setIsInitializing(false);
         }
       };
       initAuth();
 
       const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
-        setUser(u);
+        if (u) {
+            console.log("🔥 [Firebase Debug] User authenticated:", u.uid);
+            setUser(u);
+            setIsInitializing(false);
+        } else {
+            console.log("🔥 [Firebase Debug] User signed out (or not signed in yet).");
+            // Don't set demo mode here, wait for auth process
+        }
       });
       return () => unsubscribeAuth();
     } catch (err) {
-      console.error("Firebase Init Error:", err);
+      console.error("🔥 [Firebase Debug] Init Critical Error:", err);
       setIsDemoMode(true);
+      setIsInitializing(false);
     }
   }, []);
 
   // Fetch Testimonials
   useEffect(() => {
     if (isDemoMode) {
+      console.log("🔥 [Firebase Debug] Using Demo Data");
       setReviews([
         { id: '1', name: 'Priya S.', text: 'Nimisha helped me navigate my anxiety during exams. Highly recommended!', rating: 5, createdAt: { seconds: 1700000000 } },
         { id: '2', name: 'Anonymous', text: 'A very supportive and understanding psychologist.', rating: 4, createdAt: { seconds: 1690000000 } }
@@ -119,19 +159,29 @@ const App = () => {
     if (!user || !db || !appId) return;
 
     try {
-      // Use the sanitized ID. If permissions fail because the ID doesn't match backend rules,
-      // the catch block will trigger Demo Mode.
-      const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'testimonials');
+      console.log("🔥 [Firebase Debug] Setting up Firestore listener...");
       
-      // Sort in memory to reduce index dependency errors
+      // Handle path logic for Canvas vs Production
+      let collectionRef;
+      if (typeof __app_id !== 'undefined') {
+         // Strict path for Canvas: artifacts/{appId}/public/data/testimonials
+         collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'testimonials');
+      } else {
+         // Standard path for Production: testimonials
+         collectionRef = collection(db, 'testimonials');
+      }
+
+      // Query without orderBy initially to avoid index issues
       const q = query(collectionRef);
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
+        console.log(`🔥 [Firebase Debug] Snapshot received. Docs: ${snapshot.docs.length}`);
         const fetchedReviews = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
         
+        // Sort in memory
         fetchedReviews.sort((a, b) => {
             const timeA = a.createdAt?.seconds || 0;
             const timeB = b.createdAt?.seconds || 0;
@@ -140,16 +190,18 @@ const App = () => {
 
         setReviews(fetchedReviews);
       }, (error) => {
-        console.warn("Firestore access denied (likely permissions mismatch). Switching to Demo Mode.", error);
+        console.error("🔥 [Firebase Debug] Error fetching reviews:", error);
+        // Fallback to demo mode if database connection fails (e.g. permission denied)
         setIsDemoMode(true);
         setReviews([
           { id: '1', name: 'Priya S.', text: 'Nimisha helped me navigate my anxiety during exams. Highly recommended!', rating: 5, createdAt: { seconds: 1700000000 } },
           { id: '2', name: 'Anonymous', text: 'A very supportive and understanding psychologist.', rating: 4, createdAt: { seconds: 1690000000 } }
         ]);
       });
+
       return () => unsubscribe();
     } catch (e) {
-      console.error("Query failed:", e);
+      console.error("🔥 [Firebase Debug] Query setup failed:", e);
       setIsDemoMode(true);
     }
   }, [user, db, appId, isDemoMode]);
@@ -202,7 +254,6 @@ const App = () => {
     if (!reviewToDelete) return;
     setDeleteStatus('deleting');
     
-    // Simulate delete in Demo Mode
     if (isDemoMode) {
         setReviews(prev => prev.filter(r => r.id !== reviewToDelete));
         setActiveModal(null); setReviewToDelete(null); setDeleteStatus('idle');
@@ -212,14 +263,17 @@ const App = () => {
     if (!db) return;
 
     try {
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'testimonials', reviewToDelete);
+      let docRef;
+      if (typeof __app_id !== 'undefined') {
+          docRef = doc(db, 'artifacts', appId, 'public', 'data', 'testimonials', reviewToDelete);
+      } else {
+          docRef = doc(db, 'testimonials', reviewToDelete);
+      }
       await deleteDoc(docRef);
       setActiveModal(null); setReviewToDelete(null); setDeleteStatus('idle');
     } catch (error) {
       console.error("Delete failed", error);
-      // Fallback: If delete fails (permissions), just remove from UI for this session
-      setReviews(prev => prev.filter(r => r.id !== reviewToDelete));
-      setActiveModal(null); setReviewToDelete(null); setDeleteStatus('idle');
+      setDeleteStatus('error');
     }
   };
 
@@ -235,7 +289,6 @@ const App = () => {
         createdAt: serverTimestamp() 
       };
 
-      // In Demo Mode, add to local state
       if (isDemoMode) {
           const mockReview = { ...reviewData, id: Date.now().toString(), createdAt: { seconds: Date.now()/1000 } };
           setReviews([mockReview, ...reviews]);
@@ -250,7 +303,12 @@ const App = () => {
         setTimeout(() => reject(new Error("Request timed out")), 5000)
       );
 
-      const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'testimonials');
+      let collectionRef;
+      if (typeof __app_id !== 'undefined') {
+         collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'testimonials');
+      } else {
+         collectionRef = collection(db, 'testimonials');
+      }
 
       await Promise.race([
         addDoc(collectionRef, reviewData),
@@ -321,13 +379,22 @@ const App = () => {
     { role: "Volunteer Psychologist", org: "Student Care Alliance Society", period: "May 2024 - Sep 2024", desc: "Conducted 450+ individual and group sessions with aspirants." }
   ];
 
+  useEffect(() => {
+    const quotes = [
+      { text: "Empowering youth through mental health support.", image: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&fit=crop&q=80&w=800", blob1: "bg-teal-200/30", blob2: "bg-purple-200/30" },
+      { text: "Your mental health is just as important as your physical health.", image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=800", blob1: "bg-blue-300/30", blob2: "bg-sky-200/30" },
+      { text: "Small steps every day add up to big results.", image: "https://images.unsplash.com/photo-1457530378978-8bac673b8062?auto=format&fit=crop&q=80&w=800", blob1: "bg-rose-300/30", blob2: "bg-pink-200/30" }
+    ];
+    setHeroContent(quotes[Math.floor(Math.random() * quotes.length)]);
+  }, []);
+
   return (
     <div className="min-h-screen bg-stone-50 text-slate-800 font-sans selection:bg-teal-100 relative">
       {/* Demo Mode Banner */}
       {isDemoMode && (
         <div className="bg-amber-100 border-b border-amber-200 text-amber-900 px-4 py-2 text-sm text-center flex items-center justify-center gap-2 animate-fade-in">
           <Info size={16} />
-          <span><strong>Demo Mode:</strong> Database connection limited. Changes will be visible in this session only.</span>
+          <span><strong>Demo Mode:</strong> Database connection blocked (likely by Ad Blocker) or not configured. Changes will be visible in this session only.</span>
         </div>
       )}
 
@@ -490,7 +557,6 @@ const App = () => {
                 <button type="submit" disabled={reviewStatus === 'submitting'} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold">
                   {reviewStatus === 'submitting' ? 'Posting...' : 'Post Review'}
                 </button>
-                {reviewStatus === 'error' && <p className="text-red-500 text-xs mt-2">Could not post review. Please try again.</p>}
               </form>
             </div>
           </div>
