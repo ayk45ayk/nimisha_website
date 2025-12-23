@@ -77,7 +77,6 @@ const App = () => {
     } 
     
     // 2. FOR VERCEL DEPLOYMENT: Uncomment the lines below when deploying to Vercel
-    /*
     else if (import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
       console.log("🔥 [Firebase Debug] Found Vite environment variables");
       firebaseConfig = {
@@ -89,7 +88,6 @@ const App = () => {
         appId: import.meta.env.VITE_FIREBASE_APP_ID
       };
     }
-    */
 
     if (!firebaseConfig) {
       console.warn("🔥 [Firebase Debug] No configuration found. Entering Demo Mode.");
