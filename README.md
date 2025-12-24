@@ -1,36 +1,47 @@
 Nimisha Khandelwal - Portfolio
 
-Deployment on Vercel
+Payment Setup
 
-Create a Vercel Postgres database in your Vercel project dashboard.
+The website supports Razorpay (for India) and PayPal (International). You must configure the following environment variables in Vercel.
 
-In your Vercel project settings, add these Environment Variables (you can find POSTGRES_URL in the Storage tab):
+Vercel Environment Variables
 
-POSTGRES_URL
+Go to your Vercel Project -> Settings -> Environment Variables and add:
 
-POSTGRES_PRISMA_URL
+Razorpay:
 
-POSTGRES_URL_NON_POOLING
+VITE_RAZORPAY_KEY_ID: Your Razorpay Key ID (Public).
 
-POSTGRES_USER
+RAZORPAY_KEY_ID: Same as above (for Backend access).
 
-POSTGRES_HOST
+RAZORPAY_KEY_SECRET: Your Razorpay Key Secret (Private/Backend).
 
-POSTGRES_PASSWORD
+PayPal:
 
-POSTGRES_DATABASE
+VITE_PAYPAL_CLIENT_ID: Your PayPal Client ID.
 
-GEMINI_API_KEY (Optional, for moderation)
+Database & Other:
 
-EMAIL_USER & EMAIL_PASS (Optional, for emails)
+POSTGRES_URL (and related DB vars)
 
-ADMIN_EMAIL (Optional)
+EMAIL_USER & EMAIL_PASS (for booking confirmations)
+
+GEMINI_API_KEY (optional)
+
+VITE_FIREBASE_* (all firebase config keys)
 
 Local Development
 
-To run locally with Vercel Postgres, you need to pull the environment variables:
+Create a .env file for backend keys:
 
-npm i -g vercel
-vercel link
-vercel env pull .env.local
-npm run dev
+RAZORPAY_KEY_ID=your_key_id
+RAZORPAY_KEY_SECRET=your_key_secret
+
+
+Create a .env.local file for frontend keys (Vite):
+
+VITE_RAZORPAY_KEY_ID=your_key_id
+VITE_PAYPAL_CLIENT_ID=your_paypal_client_id
+
+
+Run: npm run dev

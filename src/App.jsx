@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Heart, Brain, BookOpen, Mail, Phone, MapPin, Menu, X, Award, Calendar, 
   User, Users, Smile, ArrowRight, ExternalLink, CheckCircle, Shield, FileText, 
@@ -10,7 +10,7 @@ import {
   getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp 
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
-import { getPaymentConfig, getPaymentConfigAsync, processPayment } from './utils/payment.js';
+import { getPaymentConfig, getPaymentConfigAsync, loadScript, processPayment as processDemoPayment } from './utils/payment.js';
 
 // --- Error Boundary ---
 class ErrorBoundary extends React.Component {
@@ -187,6 +187,7 @@ const App = () => {
   const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'India' });
   const [paymentStatus, setPaymentStatus] = useState('idle');
   const [paymentConfig, setPaymentConfig] = useState(getPaymentConfig()); 
+  const paypalRef = useRef(null);
 
   const [newReview, setNewReview] = useState({ name: '', text: '', rating: 5, anonymous: false });
   const [reviewStatus, setReviewStatus] = useState('idle');
@@ -206,6 +207,40 @@ const App = () => {
     };
     refineLocation();
   }, []);
+
+  // --- Payment Scripts Loading ---
+  useEffect(() => {
+    if (activeModal === 'booking' && bookingStep === 3) {
+      if (paymentConfig.provider === 'Razorpay') {
+        loadScript('https://checkout.razorpay.com/v1/checkout.js');
+      }
+      if (paymentConfig.provider === 'PayPal') {
+        const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'test'; // Fallback to 'test' if missing
+        loadScript(`https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD`).then(success => {
+          if (success && window.paypal && paypalRef.current) {
+            // Render PayPal Buttons
+            // Clear previous buttons if any
+            paypalRef.current.innerHTML = "";
+            window.paypal.Buttons({
+              createOrder: (data, actions) => {
+                return actions.order.create({
+                  purchase_units: [{
+                    amount: { value: paymentConfig.amount.toString() }
+                  }]
+                });
+              },
+              onApprove: (data, actions) => {
+                return actions.order.capture().then((details) => {
+                  handlePaymentSuccess(details);
+                });
+              }
+            }).render(paypalRef.current);
+          }
+        });
+      }
+    }
+  }, [activeModal, bookingStep, paymentConfig]);
+
 
   const scrollToSection = (sectionId) => {
     setActiveSection(sectionId);
@@ -311,37 +346,78 @@ const App = () => {
     }
   };
 
-  const handlePayment = async (e) => {
-    e.preventDefault();
+  const handlePaymentSuccess = async (details) => {
+    setPaymentStatus('success');
+    setBookingStep(4);
+    
+    // Call backend to send email
+    if (import.meta.env.PROD) {
+      try {
+        await fetch('/api/book', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                ...bookingDetails, 
+                date: selectedDate.toLocaleDateString(), 
+                slot: selectedSlot,
+                currency: paymentConfig.currency,
+                transactionId: details?.id || details?.razorpay_payment_id
+            })
+        });
+      } catch(e) { console.warn("Email API failed", e); }
+    }
+  };
+
+  const handleRazorpayPayment = async () => {
     setPaymentStatus('processing');
+    const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
+
+    if (!keyId) {
+        // Fallback for demo mode without keys
+        console.warn("VITE_RAZORPAY_KEY_ID not found. Running in Demo/Simulation mode.");
+        await processDemoPayment(paymentConfig, bookingDetails);
+        handlePaymentSuccess({ id: "demo_" + Date.now() });
+        return;
+    }
+
+    // 1. Create Order on Backend
     try {
-        await processPayment(paymentConfig, bookingDetails);
-        
-        // Only call API if NOT in demo/test mode (requires backend)
-        const isProd = import.meta.env && import.meta.env.PROD;
-        if (isProd) {
-            try {
-              const res = await fetch('/api/book', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ 
-                      ...bookingDetails, 
-                      date: selectedDate.toLocaleDateString(), 
-                      slot: selectedSlot,
-                      currency: paymentConfig.currency
-                  })
-              });
-              if (!res.ok) throw new Error("API failed");
-            } catch(apiError) {
-              console.warn("Booking API failed, but payment succeeded", apiError);
+        const response = await fetch('/api/payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: paymentConfig.amount, currency: paymentConfig.currency })
+        });
+        const orderData = await response.json();
+
+        if (!orderData.id) throw new Error("Order creation failed");
+
+        // 2. Open Razorpay Modal
+        const options = {
+            key: keyId,
+            amount: orderData.amount,
+            currency: orderData.currency,
+            name: "Nimisha Khandelwal",
+            description: "Consultation Fee",
+            order_id: orderData.id,
+            handler: function (response) {
+                handlePaymentSuccess(response);
+            },
+            prefill: {
+                name: bookingDetails.name,
+                email: bookingDetails.email,
+                contact: bookingDetails.phone
+            },
+            theme: {
+                color: "#0d9488"
             }
-        }
-        setPaymentStatus('success');
-        setBookingStep(4);
-    } catch (err) {
-        // Fallback for demo
-        setPaymentStatus('success'); 
-        setBookingStep(4); 
+        };
+
+        const rzp1 = new window.Razorpay(options);
+        rzp1.open();
+        setPaymentStatus('idle'); // Modal opened, status resets to allow retry/cancellation
+    } catch (error) {
+        console.error("Payment Error", error);
+        setPaymentStatus('error');
     }
   };
 
@@ -463,9 +539,9 @@ const App = () => {
           )}
           {bookingStep === 2 && (
             <div className="space-y-4">
-              <input type="text" placeholder="Full Name" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.name} onChange={e => setBookingDetails({...bookingDetails, name: e.target.value})} />
-              <input type="email" placeholder="Email" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.email} onChange={e => setBookingDetails({...bookingDetails, email: e.target.value})} />
-              <input type="tel" placeholder="Phone" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.phone} onChange={e => setBookingDetails({...bookingDetails, phone: e.target.value})} />
+              <input type="text" placeholder="Full Name *" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.name} onChange={e => setBookingDetails({...bookingDetails, name: e.target.value})} />
+              <input type="email" placeholder="Email *" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.email} onChange={e => setBookingDetails({...bookingDetails, email: e.target.value})} />
+              <input type="tel" placeholder="Phone *" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.phone} onChange={e => setBookingDetails({...bookingDetails, phone: e.target.value})} />
               
               <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-800 flex items-start gap-2">
                  <Globe size={16} className="mt-0.5 flex-shrink-0" />
@@ -474,7 +550,16 @@ const App = () => {
                  </div>
               </div>
 
-              <div className="flex justify-between pt-4"><button onClick={() => setBookingStep(1)}>Back</button><button onClick={() => setBookingStep(3)} className="bg-teal-600 text-white px-6 py-2 rounded-lg">Proceed</button></div>
+              <div className="flex justify-between pt-4">
+                <button onClick={() => setBookingStep(1)}>Back</button>
+                <button 
+                  disabled={!bookingDetails.name || !bookingDetails.email || !bookingDetails.phone}
+                  onClick={() => setBookingStep(3)} 
+                  className="bg-teal-600 text-white px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Proceed
+                </button>
+              </div>
             </div>
           )}
           {bookingStep === 3 && (
@@ -504,24 +589,28 @@ const App = () => {
                 )}
               </div>
 
-              <div className="flex justify-between items-center pt-4">
-                <button onClick={() => setBookingStep(2)} className="text-slate-500 font-medium hover:text-slate-700">Back</button>
-                
-                <button 
-                  onClick={handlePayment} 
-                  disabled={paymentStatus === 'processing'} 
-                  className={`w-full sm:w-auto px-8 py-3 rounded-lg font-bold shadow-lg transition-all flex items-center justify-center gap-2 ${
-                    paymentConfig?.isIndia 
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                      : 'bg-[#0070BA] hover:bg-[#003087] text-white' // PayPal Blue
-                  }`}
-                >
-                  {paymentStatus === 'processing' ? (
-                    <><Loader className="w-4 h-4 animate-spin"/> Processing...</>
-                  ) : (
-                    paymentConfig?.isIndia ? "Pay with Razorpay" : "Pay with PayPal"
-                  )}
-                </button>
+              {/* Dynamic Payment Buttons */}
+              <div className="pt-4">
+                {paymentConfig.provider === 'PayPal' ? (
+                   <div className="w-full">
+                      {/* PayPal Container */}
+                      <div ref={paypalRef} className="min-h-[150px] flex items-center justify-center">
+                         <div className="text-sm text-gray-400">Loading PayPal...</div>
+                      </div>
+                      <button onClick={() => setBookingStep(2)} className="mt-4 text-slate-500 font-medium hover:text-slate-700 text-sm">Back</button>
+                   </div>
+                ) : (
+                   <div className="flex justify-between items-center">
+                    <button onClick={() => setBookingStep(2)} className="text-slate-500 font-medium hover:text-slate-700">Back</button>
+                    <button 
+                      onClick={handleRazorpayPayment} 
+                      disabled={paymentStatus === 'processing'} 
+                      className="w-full sm:w-auto px-8 py-3 rounded-lg font-bold shadow-lg transition-all flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {paymentStatus === 'processing' ? <><Loader className="w-4 h-4 animate-spin"/> Processing...</> : "Pay with Razorpay"}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

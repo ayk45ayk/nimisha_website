@@ -1,6 +1,5 @@
 /**
  * Synchronous Fallback: Checks Timezone.
- * Fast, non-blocking, but strictly a heuristic.
  */
 export const getPaymentConfig = () => {
   try {
@@ -11,19 +10,16 @@ export const getPaymentConfig = () => {
   } catch (e) {
     console.warn("Timezone detection failed", e);
   }
-  // Default to International
   return { isIndia: false, currency: 'USD', amount: 30, provider: 'PayPal', symbol: '$' };
 };
 
 /**
  * Asynchronous / Accurate: Checks IP Address.
- * Uses a free IP geolocation API to confirm the country.
  */
 export const getPaymentConfigAsync = async () => {
   try {
-    // We use a timeout to ensure the UI doesn't hang if the API is slow
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 3000); 
 
     const response = await fetch('https://ipapi.co/json/', { signal: controller.signal });
     clearTimeout(timeoutId);
@@ -39,18 +35,35 @@ export const getPaymentConfigAsync = async () => {
     }
   } catch (error) {
     console.warn("IP Geolocation failed or timed out, falling back to Timezone", error);
-    return getPaymentConfig(); // Fallback to timezone if IP check fails
+    return getPaymentConfig(); 
   }
 };
 
 /**
- * Simulates the payment process.
+ * Loads a script dynamically.
+ */
+export const loadScript = (src) => {
+  return new Promise((resolve) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+        resolve(true);
+        return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
+/**
+ * Simulates a payment for demo purposes or when keys are missing.
  */
 export const processPayment = async (paymentConfig, bookingDetails) => {
-  console.log(`Initializing ${paymentConfig.provider} for ${paymentConfig.currency} ${paymentConfig.amount}`);
+  console.log(`Initializing ${paymentConfig.provider} (Demo Mode) for ${paymentConfig.currency} ${paymentConfig.amount}`);
   await new Promise(resolve => setTimeout(resolve, 2000));
   return {
     success: true,
-    transactionId: `tx_${paymentConfig.provider}_${Date.now()}`
+    transactionId: `tx_${paymentConfig.provider}_demo_${Date.now()}`
   };
 };
