@@ -314,6 +314,7 @@ const App = () => {
                 body: JSON.stringify({ ...bookingDetails, date: selectedDate.toLocaleDateString(), slot: selectedSlot })
             });
         }
+
         setTimeout(() => { setPaymentStatus('success'); setBookingStep(4); }, 1500);
     } catch (err) {
         setTimeout(() => { setPaymentStatus('success'); setBookingStep(4); }, 1500);
@@ -345,8 +346,6 @@ const App = () => {
     }
     return dates;
   };
-  
-  // Expanded time slots as requested
   const timeSlots = [
     "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", 
     "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", 
@@ -492,6 +491,62 @@ const App = () => {
             <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl rotate-2">
               <img src={heroContent.image} alt="Wellness" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-black/40 flex items-end p-8"><p className="text-white text-lg italic">"{heroContent.text}"</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* About */}
+      <section id="about" className="py-20 px-6 bg-white">
+        <div className="container mx-auto max-w-5xl">
+          <div className="text-center mb-16 space-y-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800">About Me</h2>
+            <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
+            <p className="text-slate-600 max-w-2xl mx-auto">
+              With a strong academic foundation and hands-on experience in clinical and educational settings, I strive to create safe spaces for growth and healing.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6 text-slate-600 leading-relaxed">
+              <p>
+                Hello, I'm <strong className="text-teal-700">Nimisha Khandelwal</strong>, a Counselling Psychologist based in Indore. 
+                I hold a Gold Medal in M.A. Psychology from Mohanlal Sukhadia University and specialized training in Clinical Psychology.
+              </p>
+              <p>
+                My journey includes significant tenure at <span className="font-semibold text-slate-800">Allen Career Institute, Kota</span>, where I supported students through high-pressure academic environments.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-4 mt-6">
+                <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
+                  <h4 className="font-bold text-slate-800 mb-1">Education</h4>
+                  <p className="text-sm">M.A. Psychology (Gold Medalist)</p>
+                  <p className="text-xs text-slate-500 mt-1">Specialization in Clinical Psychology</p>
+                </div>
+                <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
+                  <h4 className="font-bold text-slate-800 mb-1">Key Skills</h4>
+                  <p className="text-sm">CBT, Reality Therapy, Crisis Intervention</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+               {/* Certifications Card */}
+               <div className="bg-teal-600 text-white p-8 rounded-2xl shadow-xl">
+                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                   <Award className="w-6 h-6" /> Certifications
+                 </h3>
+                 <ul className="space-y-4 text-teal-50">
+                   <li className="flex items-start gap-3">
+                     <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
+                     <span>QPR Gatekeeper Certification</span>
+                   </li>
+                   <li className="flex items-start gap-3">
+                     <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
+                     <span>Choice Theory & Reality Therapy</span>
+                   </li>
+                 </ul>
+               </div>
             </div>
           </div>
         </div>
