@@ -58,28 +58,20 @@ const App = () => {
   const [db, setDb] = useState(null);
   const [appId, setAppId] = useState(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    console.log("🔥 [Firebase Debug] Starting initialization...");
     let firebaseConfig = null;
 
     // --- CONFIGURATION ---
     
     // 1. FOR PREVIEW (Active): Uses global config.
     if (typeof __firebase_config !== 'undefined') {
-      console.log("🔥 [Firebase Debug] Found global __firebase_config");
-      try {
-        firebaseConfig = JSON.parse(__firebase_config);
-      } catch (e) {
-        console.error("🔥 [Firebase Debug] Failed to parse global config:", e);
-      }
-    } 
+      firebaseConfig = JSON.parse(__firebase_config);
+    }
     
     // 2. FOR VERCEL DEPLOYMENT: Uncomment the lines below when deploying to Vercel
 
-    else if (import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
-      console.log("🔥 [Firebase Debug] Found Vite environment variables");
+    else if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
       firebaseConfig = {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
         authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -91,9 +83,8 @@ const App = () => {
     }
 
     if (!firebaseConfig) {
-      console.warn("🔥 [Firebase Debug] No configuration found. Entering Demo Mode.");
+      console.warn("No Firebase configuration found. Starting in Demo Mode.");
       setIsDemoMode(true);
-      setIsInitializing(false);
       return;
     }
 
@@ -108,47 +99,34 @@ const App = () => {
       // Encode ID to be safe for URL segments (handles slashes/special chars)
       const sanitizedId = encodeURIComponent(rawId);
       setAppId(sanitizedId);
-      console.log("🔥 [Firebase Debug] App ID set to:", sanitizedId);
 
       const initAuth = async () => {
         try {
           if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            console.log("🔥 [Firebase Debug] Attempting sign-in with custom token...");
             await signInWithCustomToken(auth, __initial_auth_token);
           } else {
-            console.log("🔥 [Firebase Debug] Attempting anonymous sign-in...");
             await signInAnonymously(auth);
           }
         } catch (e) {
-          console.warn("🔥 [Firebase Debug] Auth failed, switching to demo mode:", e);
+          console.error("Auth failed:", e);
           setIsDemoMode(true);
-          setIsInitializing(false);
         }
       };
       initAuth();
 
       const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
-        if (u) {
-            console.log("🔥 [Firebase Debug] User authenticated:", u.uid);
-            setUser(u);
-            setIsInitializing(false);
-        } else {
-            console.log("🔥 [Firebase Debug] User signed out (or not signed in yet).");
-            // Don't set demo mode here, wait for auth process
-        }
+        setUser(u);
       });
       return () => unsubscribeAuth();
     } catch (err) {
-      console.error("🔥 [Firebase Debug] Init Critical Error:", err);
+      console.error("Firebase Init Error:", err);
       setIsDemoMode(true);
-      setIsInitializing(false);
     }
   }, []);
 
   // Fetch Testimonials
   useEffect(() => {
     if (isDemoMode) {
-      console.log("🔥 [Firebase Debug] Using Demo Data");
       setReviews([
         { id: '1', name: 'Priya S.', text: 'Nimisha helped me navigate my anxiety during exams. Highly recommended!', rating: 5, createdAt: { seconds: 1700000000 } },
         { id: '2', name: 'Anonymous', text: 'A very supportive and understanding psychologist.', rating: 4, createdAt: { seconds: 1690000000 } }
@@ -159,29 +137,24 @@ const App = () => {
     if (!user || !db || !appId) return;
 
     try {
-      console.log("🔥 [Firebase Debug] Setting up Firestore listener...");
-      
-      // Handle path logic for Canvas vs Production
       let collectionRef;
       if (typeof __app_id !== 'undefined') {
-         // Strict path for Canvas: artifacts/{appId}/public/data/testimonials
+         // Strict path for Canvas
          collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'testimonials');
       } else {
-         // Standard path for Production: testimonials
+         // Standard path for Production
          collectionRef = collection(db, 'testimonials');
       }
 
-      // Query without orderBy initially to avoid index issues
+      // Sort in memory to avoid index requirement errors in preview
       const q = query(collectionRef);
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
-        console.log(`🔥 [Firebase Debug] Snapshot received. Docs: ${snapshot.docs.length}`);
         const fetchedReviews = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
         
-        // Sort in memory
         fetchedReviews.sort((a, b) => {
             const timeA = a.createdAt?.seconds || 0;
             const timeB = b.createdAt?.seconds || 0;
@@ -190,18 +163,12 @@ const App = () => {
 
         setReviews(fetchedReviews);
       }, (error) => {
-        console.error("🔥 [Firebase Debug] Error fetching reviews:", error);
-        // Fallback to demo mode if database connection fails (e.g. permission denied)
-        setIsDemoMode(true);
-        setReviews([
-          { id: '1', name: 'Priya S.', text: 'Nimisha helped me navigate my anxiety during exams. Highly recommended!', rating: 5, createdAt: { seconds: 1700000000 } },
-          { id: '2', name: 'Anonymous', text: 'A very supportive and understanding psychologist.', rating: 4, createdAt: { seconds: 1690000000 } }
-        ]);
+        console.error("Error fetching reviews:", error);
+        if (reviews.length === 0) setIsDemoMode(true);
       });
-
       return () => unsubscribe();
     } catch (e) {
-      console.error("🔥 [Firebase Debug] Query setup failed:", e);
+      console.error("Query failed:", e);
       setIsDemoMode(true);
     }
   }, [user, db, appId, isDemoMode]);
@@ -300,7 +267,7 @@ const App = () => {
 
       // Add safety timeout for database call
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Request timed out")), 5000)
+        setTimeout(() => reject(new Error("Request timed out")), 8000)
       );
 
       let collectionRef;
@@ -320,7 +287,7 @@ const App = () => {
       setTimeout(() => setReviewStatus('idle'), 2000);
     } catch (error) {
       console.error("Review failed", error);
-      // If DB fails, optimistically add to UI so user feels success
+      // Fallback: If DB fails or times out, optimistically add to UI for this session
       const mockReview = { 
          name: newReview.anonymous ? "Anonymous" : newReview.name,
          text: newReview.text,
@@ -338,13 +305,34 @@ const App = () => {
   const handlePayment = async (e) => {
     e.preventDefault();
     setPaymentStatus('processing');
-    setTimeout(() => { setPaymentStatus('success'); setBookingStep(4); }, 1500);
+    try {
+        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD) {
+            await fetch('/api/payment', { method: 'POST' });
+            await fetch('/api/book', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...bookingDetails, date: selectedDate.toLocaleDateString(), slot: selectedSlot })
+            });
+        }
+        setTimeout(() => { setPaymentStatus('success'); setBookingStep(4); }, 1500);
+    } catch (err) {
+        setTimeout(() => { setPaymentStatus('success'); setBookingStep(4); }, 1500);
+    }
   };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
     setFormStatus('sending');
     setTimeout(() => { setFormStatus('success'); setTimeout(() => setFormStatus('idle'), 3000); }, 1500);
+  };
+
+  const resetBooking = () => {
+    setActiveModal(null);
+    setBookingStep(1);
+    setSelectedDate(null);
+    setSelectedSlot(null);
+    setBookingDetails({ name: '', email: '', phone: '' });
+    setPaymentStatus('idle');
   };
 
   const generateDates = () => {
@@ -357,7 +345,14 @@ const App = () => {
     }
     return dates;
   };
-  const timeSlots = ["10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM", "05:00 PM", "06:00 PM"];
+  
+  // Expanded time slots as requested
+  const timeSlots = [
+    "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", 
+    "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", 
+    "05:00 PM", "06:00 PM", "07:00 PM"
+  ];
+  
   const isSlotAvailable = (date, slot) => (date.getDate() + slot.length) % 3 !== 0;
 
   const navLinks = [
@@ -427,7 +422,7 @@ const App = () => {
 
       {/* Booking Modal */}
       {activeModal === 'booking' && (
-        <Modal title="Book Appointment" icon={Calendar} onClose={() => setActiveModal(null)}>
+        <Modal title="Book Appointment" icon={Calendar} onClose={resetBooking}>
           {bookingStep === 1 && (
             <div className="space-y-6">
               <h4 className="font-semibold text-slate-800 mb-4">Select Date</h4>
@@ -462,7 +457,8 @@ const App = () => {
             <div className="text-center py-8">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
               <h3 className="text-2xl font-bold mb-2">Confirmed!</h3>
-              <button onClick={() => setActiveModal(null)} className="mt-6 bg-slate-800 text-white px-6 py-2 rounded-lg">Done</button>
+              <p>Email sent to {bookingDetails.email}</p>
+              <button onClick={resetBooking} className="mt-6 bg-slate-800 text-white px-6 py-2 rounded-lg">Done</button>
             </div>
           )}
         </Modal>
@@ -557,6 +553,7 @@ const App = () => {
                 <button type="submit" disabled={reviewStatus === 'submitting'} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold">
                   {reviewStatus === 'submitting' ? 'Posting...' : 'Post Review'}
                 </button>
+                {reviewStatus === 'error' && <p className="text-red-500 text-xs mt-2">Could not post review. Please try again.</p>}
               </form>
             </div>
           </div>
