@@ -82,7 +82,7 @@ const App = () => {
     }
 
     if (!firebaseConfig) {
-      console.warn("No Firebase configuration found. Entering Demo Mode.");
+      console.warn("No Firebase configuration found. Starting in Demo Mode.");
       setIsDemoMode(true);
       return;
     }
@@ -94,7 +94,9 @@ const App = () => {
       setDb(firestore);
       
       const rawId = typeof __app_id !== 'undefined' ? __app_id : 'nimisha-portfolio-prod';
-      setAppId(encodeURIComponent(rawId));
+      // Encode ID to be safe for URL segments (handles slashes/special chars)
+      const sanitizedId = encodeURIComponent(rawId);
+      setAppId(sanitizedId);
 
       const initAuth = async () => {
         try {
@@ -293,6 +295,7 @@ const App = () => {
       setTimeout(() => setReviewStatus('idle'), 2000);
     } catch (error) {
       console.error("Review failed", error);
+      // Fallback: If DB fails or times out, optimistically add to UI for this session
       const mockReview = { 
          name: newReview.anonymous ? "Anonymous" : newReview.name,
          text: newReview.text,
