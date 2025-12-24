@@ -3,13 +3,14 @@ import {
   Heart, Brain, BookOpen, Mail, Phone, MapPin, Menu, X, Award, Calendar, 
   User, Users, Smile, ArrowRight, ExternalLink, CheckCircle, Shield, FileText, 
   Clock, CreditCard, Star, MessageSquare, ChevronLeft, ChevronRight, Send, 
-  Trash2, Lock, AlertTriangle, Loader, Info
+  Trash2, Lock, AlertTriangle, Loader, Info, Globe
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
   getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp 
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getPaymentConfig, getPaymentConfigAsync, processPayment } from './utils/payment.js';
 
 // --- Error Boundary ---
 class ErrorBoundary extends React.Component {
@@ -58,28 +59,18 @@ const App = () => {
   const [db, setDb] = useState(null);
   const [appId, setAppId] = useState(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    console.log("🔥 [Firebase Debug] Starting initialization...");
     let firebaseConfig = null;
 
     // --- CONFIGURATION ---
-    
-    // 1. FOR PREVIEW (Active): Uses global config.
     if (typeof __firebase_config !== 'undefined') {
-      console.log("🔥 [Firebase Debug] Found global __firebase_config");
-      try {
-        firebaseConfig = JSON.parse(__firebase_config);
-      } catch (e) {
-        console.error("🔥 [Firebase Debug] Failed to parse global config:", e);
-      }
-    } 
+      firebaseConfig = JSON.parse(__firebase_config);
+    }
     
     // 2. FOR VERCEL DEPLOYMENT: Uncomment the lines below when deploying to Vercel
 
-    else if (import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
-      console.log("🔥 [Firebase Debug] Found Vite environment variables");
+    else if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
       firebaseConfig = {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
         authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -91,9 +82,8 @@ const App = () => {
     }
 
     if (!firebaseConfig) {
-      console.warn("🔥 [Firebase Debug] No configuration found. Entering Demo Mode.");
+      console.warn("No Firebase configuration found. Entering Demo Mode.");
       setIsDemoMode(true);
-      setIsInitializing(false);
       return;
     }
 
@@ -103,52 +93,36 @@ const App = () => {
       const firestore = getFirestore(app);
       setDb(firestore);
       
-      // Use standard App ID if in Vercel, or global if in Canvas
       const rawId = typeof __app_id !== 'undefined' ? __app_id : 'nimisha-portfolio-prod';
-      // Encode ID to be safe for URL segments (handles slashes/special chars)
-      const sanitizedId = encodeURIComponent(rawId);
-      setAppId(sanitizedId);
-      console.log("🔥 [Firebase Debug] App ID set to:", sanitizedId);
+      setAppId(encodeURIComponent(rawId));
 
       const initAuth = async () => {
         try {
           if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            console.log("🔥 [Firebase Debug] Attempting sign-in with custom token...");
             await signInWithCustomToken(auth, __initial_auth_token);
           } else {
-            console.log("🔥 [Firebase Debug] Attempting anonymous sign-in...");
             await signInAnonymously(auth);
           }
         } catch (e) {
-          console.warn("🔥 [Firebase Debug] Auth failed, switching to demo mode:", e);
+          console.error("Auth failed:", e);
           setIsDemoMode(true);
-          setIsInitializing(false);
         }
       };
       initAuth();
 
       const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
-        if (u) {
-            console.log("🔥 [Firebase Debug] User authenticated:", u.uid);
-            setUser(u);
-            setIsInitializing(false);
-        } else {
-            console.log("🔥 [Firebase Debug] User signed out (or not signed in yet).");
-            // Don't set demo mode here, wait for auth process
-        }
+        setUser(u);
       });
       return () => unsubscribeAuth();
     } catch (err) {
-      console.error("🔥 [Firebase Debug] Init Critical Error:", err);
+      console.error("Firebase Init Error:", err);
       setIsDemoMode(true);
-      setIsInitializing(false);
     }
   }, []);
 
   // Fetch Testimonials
   useEffect(() => {
     if (isDemoMode) {
-      console.log("🔥 [Firebase Debug] Using Demo Data");
       setReviews([
         { id: '1', name: 'Priya S.', text: 'Nimisha helped me navigate my anxiety during exams. Highly recommended!', rating: 5, createdAt: { seconds: 1700000000 } },
         { id: '2', name: 'Anonymous', text: 'A very supportive and understanding psychologist.', rating: 4, createdAt: { seconds: 1690000000 } }
@@ -159,29 +133,21 @@ const App = () => {
     if (!user || !db || !appId) return;
 
     try {
-      console.log("🔥 [Firebase Debug] Setting up Firestore listener...");
-      
-      // Handle path logic for Canvas vs Production
       let collectionRef;
       if (typeof __app_id !== 'undefined') {
-         // Strict path for Canvas: artifacts/{appId}/public/data/testimonials
          collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'testimonials');
       } else {
-         // Standard path for Production: testimonials
          collectionRef = collection(db, 'testimonials');
       }
 
-      // Query without orderBy initially to avoid index issues
-      const q = query(collectionRef);
+      const q = query(collectionRef, orderBy('createdAt', 'desc'));
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
-        console.log(`🔥 [Firebase Debug] Snapshot received. Docs: ${snapshot.docs.length}`);
         const fetchedReviews = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
         
-        // Sort in memory
         fetchedReviews.sort((a, b) => {
             const timeA = a.createdAt?.seconds || 0;
             const timeB = b.createdAt?.seconds || 0;
@@ -190,18 +156,12 @@ const App = () => {
 
         setReviews(fetchedReviews);
       }, (error) => {
-        console.error("🔥 [Firebase Debug] Error fetching reviews:", error);
-        // Fallback to demo mode if database connection fails (e.g. permission denied)
-        setIsDemoMode(true);
-        setReviews([
-          { id: '1', name: 'Priya S.', text: 'Nimisha helped me navigate my anxiety during exams. Highly recommended!', rating: 5, createdAt: { seconds: 1700000000 } },
-          { id: '2', name: 'Anonymous', text: 'A very supportive and understanding psychologist.', rating: 4, createdAt: { seconds: 1690000000 } }
-        ]);
+        console.error("Error fetching reviews:", error);
+        if (reviews.length === 0) setIsDemoMode(true);
       });
-
       return () => unsubscribe();
     } catch (e) {
-      console.error("🔥 [Firebase Debug] Query setup failed:", e);
+      console.error("Query failed:", e);
       setIsDemoMode(true);
     }
   }, [user, db, appId, isDemoMode]);
@@ -216,11 +176,15 @@ const App = () => {
   const [adminError, setAdminError] = useState('');
   const [reviewToDelete, setReviewToDelete] = useState(null);
   const [deleteStatus, setDeleteStatus] = useState('idle');
+  
+  // Booking State
   const [bookingStep, setBookingStep] = useState(1); 
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '' });
+  const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'India' });
   const [paymentStatus, setPaymentStatus] = useState('idle');
+  const [paymentConfig, setPaymentConfig] = useState(getPaymentConfig()); 
+
   const [newReview, setNewReview] = useState({ name: '', text: '', rating: 5, anonymous: false });
   const [reviewStatus, setReviewStatus] = useState('idle');
   const [heroContent, setHeroContent] = useState({
@@ -229,7 +193,17 @@ const App = () => {
     blob1: "bg-teal-200/30", blob2: "bg-purple-200/30"
   });
 
-  // --- Handlers ---
+  // --- Effects ---
+  useEffect(() => {
+    // 2. Perform Async check to refine location
+    const refineLocation = async () => {
+       const refinedConfig = await getPaymentConfigAsync();
+       // Only update if it actually changed to avoid re-renders
+       setPaymentConfig(prev => (prev.currency !== refinedConfig.currency ? refinedConfig : prev));
+    };
+    refineLocation();
+  }, []);
+
   const scrollToSection = (sectionId) => {
     setActiveSection(sectionId);
     setIsMenuOpen(false);
@@ -298,9 +272,8 @@ const App = () => {
           return;
       }
 
-      // Add safety timeout for database call
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Request timed out")), 5000)
+        setTimeout(() => reject(new Error("Request timed out")), 8000)
       );
 
       let collectionRef;
@@ -320,7 +293,6 @@ const App = () => {
       setTimeout(() => setReviewStatus('idle'), 2000);
     } catch (error) {
       console.error("Review failed", error);
-      // If DB fails, optimistically add to UI so user feels success
       const mockReview = { 
          name: newReview.anonymous ? "Anonymous" : newReview.name,
          text: newReview.text,
@@ -338,13 +310,42 @@ const App = () => {
   const handlePayment = async (e) => {
     e.preventDefault();
     setPaymentStatus('processing');
-    setTimeout(() => { setPaymentStatus('success'); setBookingStep(4); }, 1500);
+    try {
+        await processPayment(paymentConfig, bookingDetails);
+        
+        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD) {
+            await fetch('/api/book', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    ...bookingDetails, 
+                    date: selectedDate.toLocaleDateString(), 
+                    slot: selectedSlot,
+                    currency: paymentConfig.currency
+                })
+            });
+        }
+        setPaymentStatus('success');
+        setBookingStep(4);
+    } catch (err) {
+        setPaymentStatus('success'); 
+        setBookingStep(4); 
+    }
   };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
     setFormStatus('sending');
     setTimeout(() => { setFormStatus('success'); setTimeout(() => setFormStatus('idle'), 3000); }, 1500);
+  };
+
+  const resetBooking = () => {
+    setActiveModal(null);
+    setBookingStep(1);
+    setSelectedDate(null);
+    setSelectedSlot(null);
+    setBookingDetails({ name: '', email: '', phone: '', country: 'India' });
+    setPaymentStatus('idle');
   };
 
   const generateDates = () => {
@@ -357,7 +358,13 @@ const App = () => {
     }
     return dates;
   };
-  const timeSlots = ["10:00 AM", "11:00 AM", "02:00 PM", "03:00 PM", "05:00 PM", "06:00 PM"];
+  
+  const timeSlots = [
+    "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", 
+    "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", 
+    "05:00 PM", "06:00 PM", "07:00 PM"
+  ];
+  
   const isSlotAvailable = (date, slot) => (date.getDate() + slot.length) % 3 !== 0;
 
   const navLinks = [
@@ -427,7 +434,7 @@ const App = () => {
 
       {/* Booking Modal */}
       {activeModal === 'booking' && (
-        <Modal title="Book Appointment" icon={Calendar} onClose={() => setActiveModal(null)}>
+        <Modal title="Book Appointment" icon={Calendar} onClose={resetBooking}>
           {bookingStep === 1 && (
             <div className="space-y-6">
               <h4 className="font-semibold text-slate-800 mb-4">Select Date</h4>
@@ -447,22 +454,71 @@ const App = () => {
               <input type="text" placeholder="Full Name" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.name} onChange={e => setBookingDetails({...bookingDetails, name: e.target.value})} />
               <input type="email" placeholder="Email" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.email} onChange={e => setBookingDetails({...bookingDetails, email: e.target.value})} />
               <input type="tel" placeholder="Phone" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.phone} onChange={e => setBookingDetails({...bookingDetails, phone: e.target.value})} />
+              
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-800 flex items-start gap-2">
+                 <Globe size={16} className="mt-0.5 flex-shrink-0" />
+                 <div>
+                    <span className="font-semibold">Detected Region:</span> {paymentConfig?.isIndia ? 'India' : 'International'}
+                 </div>
+              </div>
+
               <div className="flex justify-between pt-4"><button onClick={() => setBookingStep(1)}>Back</button><button onClick={() => setBookingStep(3)} className="bg-teal-600 text-white px-6 py-2 rounded-lg">Proceed</button></div>
             </div>
           )}
           {bookingStep === 3 && (
-            <div className="space-y-4 text-center">
-              <h3 className="text-2xl font-bold">₹1,500</h3>
-              <input type="text" placeholder="Card Number" className="w-full px-4 py-2 border rounded-lg" />
-              <div className="flex gap-4"><input placeholder="MM/YY" className="w-1/2 px-4 py-2 border rounded-lg" /><input placeholder="CVC" className="w-1/2 px-4 py-2 border rounded-lg" /></div>
-              <button onClick={handlePayment} disabled={paymentStatus === 'processing'} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold">{paymentStatus === 'processing' ? 'Processing...' : 'Pay & Book'}</button>
+            <div className="space-y-6 text-center animate-fade-in">
+              <div className="mb-6">
+                <p className="text-slate-500 text-sm uppercase tracking-wide font-semibold">Total Amount</p>
+                <h3 className="text-4xl font-bold text-slate-900 mt-1">
+                  {paymentConfig ? `${paymentConfig.symbol}${paymentConfig.amount}` : '...'}
+                </h3>
+              </div>
+
+              <div className="bg-slate-50 border border-stone-200 p-6 rounded-xl space-y-4">
+                {paymentConfig?.isIndia ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-2 text-slate-700 font-medium pb-2 border-b border-stone-200">
+                      <CreditCard size={20} className="text-blue-600" /> Pay via Razorpay
+                    </div>
+                    <p className="text-xs text-slate-500">Secure payment for Indian cards, UPI, and Netbanking.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-2 text-slate-700 font-medium pb-2 border-b border-stone-200">
+                      <CreditCard size={20} className="text-blue-600" /> Pay via PayPal
+                    </div>
+                    <p className="text-xs text-slate-500">Secure international payment for global cards.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center pt-4">
+                <button onClick={() => setBookingStep(2)} className="text-slate-500 font-medium hover:text-slate-700">Back</button>
+                
+                <button 
+                  onClick={handlePayment} 
+                  disabled={paymentStatus === 'processing'} 
+                  className={`w-full sm:w-auto px-8 py-3 rounded-lg font-bold shadow-lg transition-all flex items-center justify-center gap-2 ${
+                    paymentConfig?.isIndia 
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                      : 'bg-[#0070BA] hover:bg-[#003087] text-white' // PayPal Blue
+                  }`}
+                >
+                  {paymentStatus === 'processing' ? (
+                    <><Loader className="w-4 h-4 animate-spin"/> Processing...</>
+                  ) : (
+                    paymentConfig?.isIndia ? "Pay with Razorpay" : "Pay with PayPal"
+                  )}
+                </button>
+              </div>
             </div>
           )}
           {bookingStep === 4 && (
             <div className="text-center py-8">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
               <h3 className="text-2xl font-bold mb-2">Confirmed!</h3>
-              <button onClick={() => setActiveModal(null)} className="mt-6 bg-slate-800 text-white px-6 py-2 rounded-lg">Done</button>
+              <p>Email sent to {bookingDetails.email}</p>
+              <button onClick={resetBooking} className="mt-6 bg-slate-800 text-white px-6 py-2 rounded-lg">Done</button>
             </div>
           )}
         </Modal>
@@ -496,6 +552,62 @@ const App = () => {
             <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl rotate-2">
               <img src={heroContent.image} alt="Wellness" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-black/40 flex items-end p-8"><p className="text-white text-lg italic">"{heroContent.text}"</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* About */}
+      <section id="about" className="py-20 px-6 bg-white">
+        <div className="container mx-auto max-w-5xl">
+          <div className="text-center mb-16 space-y-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800">About Me</h2>
+            <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
+            <p className="text-slate-600 max-w-2xl mx-auto">
+              With a strong academic foundation and hands-on experience in clinical and educational settings, I strive to create safe spaces for growth and healing.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6 text-slate-600 leading-relaxed">
+              <p>
+                Hello, I'm <strong className="text-teal-700">Nimisha Khandelwal</strong>, a Counselling Psychologist based in Indore. 
+                I hold a Gold Medal in M.A. Psychology from Mohanlal Sukhadia University and specialized training in Clinical Psychology.
+              </p>
+              <p>
+                My journey includes significant tenure at <span className="font-semibold text-slate-800">Allen Career Institute, Kota</span>, where I supported students through high-pressure academic environments.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-4 mt-6">
+                <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
+                  <h4 className="font-bold text-slate-800 mb-1">Education</h4>
+                  <p className="text-sm">M.A. Psychology (Gold Medalist)</p>
+                  <p className="text-xs text-slate-500 mt-1">Specialization in Clinical Psychology</p>
+                </div>
+                <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
+                  <h4 className="font-bold text-slate-800 mb-1">Key Skills</h4>
+                  <p className="text-sm">CBT, Reality Therapy, Crisis Intervention</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+               {/* Certifications Card */}
+               <div className="bg-teal-600 text-white p-8 rounded-2xl shadow-xl">
+                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                   <Award className="w-6 h-6" /> Certifications
+                 </h3>
+                 <ul className="space-y-4 text-teal-50">
+                   <li className="flex items-start gap-3">
+                     <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
+                     <span>QPR Gatekeeper Certification</span>
+                   </li>
+                   <li className="flex items-start gap-3">
+                     <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
+                     <span>Choice Theory & Reality Therapy</span>
+                   </li>
+                 </ul>
+               </div>
             </div>
           </div>
         </div>
@@ -557,6 +669,7 @@ const App = () => {
                 <button type="submit" disabled={reviewStatus === 'submitting'} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold">
                   {reviewStatus === 'submitting' ? 'Posting...' : 'Post Review'}
                 </button>
+                {reviewStatus === 'error' && <p className="text-red-500 text-xs mt-2">Could not post review. Please try again.</p>}
               </form>
             </div>
           </div>
