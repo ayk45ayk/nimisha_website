@@ -63,14 +63,15 @@ const App = () => {
   useEffect(() => {
     let firebaseConfig = null;
 
-    // --- CONFIGURATION ---
+    // 1. Try Global Config (Internal Envs)
     if (typeof __firebase_config !== 'undefined') {
-      firebaseConfig = JSON.parse(__firebase_config);
+      try {
+        firebaseConfig = JSON.parse(__firebase_config);
+      } catch (e) { console.warn("Failed to parse global firebase config"); }
     }
     
-    // 2. FOR VERCEL DEPLOYMENT: Uncomment the lines below when deploying to Vercel
-
-    else if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
+    // 2. Try Standard Vite Environment Variables (Vercel)
+    if (!firebaseConfig && import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
       firebaseConfig = {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
         authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -81,6 +82,7 @@ const App = () => {
       };
     }
 
+    // 3. Fallback to Demo Mode if no config found
     if (!firebaseConfig) {
       console.warn("No Firebase configuration found. Starting in Demo Mode.");
       setIsDemoMode(true);
@@ -94,7 +96,6 @@ const App = () => {
       setDb(firestore);
       
       const rawId = typeof __app_id !== 'undefined' ? __app_id : 'nimisha-portfolio-prod';
-      // Encode ID to be safe for URL segments (handles slashes/special chars)
       const sanitizedId = encodeURIComponent(rawId);
       setAppId(sanitizedId);
 
@@ -316,21 +317,29 @@ const App = () => {
     try {
         await processPayment(paymentConfig, bookingDetails);
         
-        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD) {
-            await fetch('/api/book', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    ...bookingDetails, 
-                    date: selectedDate.toLocaleDateString(), 
-                    slot: selectedSlot,
-                    currency: paymentConfig.currency
-                })
-            });
+        // Only call API if NOT in demo/test mode (requires backend)
+        const isProd = import.meta.env && import.meta.env.PROD;
+        if (isProd) {
+            try {
+              const res = await fetch('/api/book', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                      ...bookingDetails, 
+                      date: selectedDate.toLocaleDateString(), 
+                      slot: selectedSlot,
+                      currency: paymentConfig.currency
+                  })
+              });
+              if (!res.ok) throw new Error("API failed");
+            } catch(apiError) {
+              console.warn("Booking API failed, but payment succeeded", apiError);
+            }
         }
         setPaymentStatus('success');
         setBookingStep(4);
     } catch (err) {
+        // Fallback for demo
         setPaymentStatus('success'); 
         setBookingStep(4); 
     }
@@ -404,7 +413,7 @@ const App = () => {
       {isDemoMode && (
         <div className="bg-amber-100 border-b border-amber-200 text-amber-900 px-4 py-2 text-sm text-center flex items-center justify-center gap-2 animate-fade-in">
           <Info size={16} />
-          <span><strong>Demo Mode:</strong> Database connection blocked (likely by Ad Blocker) or not configured. Changes will be visible in this session only.</span>
+          <span><strong>Demo Mode:</strong> Database not configured. Changes will be visible in this session only.</span>
         </div>
       )}
 
