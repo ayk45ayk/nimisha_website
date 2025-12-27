@@ -3,7 +3,7 @@ import {
   Heart, Brain, BookOpen, Mail, Phone, MapPin, Menu, X, Award, Calendar, 
   User, Users, Smile, ArrowRight, ExternalLink, CheckCircle, Shield, FileText, 
   Clock, CreditCard, Star, MessageSquare, ChevronLeft, ChevronRight, Send, 
-  Trash2, Lock, AlertTriangle, Loader, Info, Globe
+  Trash2, Lock, AlertTriangle, Loader, Info, Globe, Cookie
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -58,6 +58,10 @@ const Modal = ({ title, children, icon: Icon, onClose, className = "" }) => (
 );
 
 const App = () => {
+  // --- Navigation & Routing State ---
+  const [activePage, setActivePage] = useState('home'); // 'home', 'about', 'experience'
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
   // --- Firebase Setup ---
   const [user, setUser] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -175,8 +179,6 @@ const App = () => {
   }, [user, db, appId, isDemoMode]);
 
   // --- State ---
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState('home');
   const [activeModal, setActiveModal] = useState(null);
   const [formStatus, setFormStatus] = useState('idle');
   const [isAdmin, setIsAdmin] = useState(false);
@@ -220,11 +222,9 @@ const App = () => {
         loadScript('https://checkout.razorpay.com/v1/checkout.js');
       }
       if (paymentConfig.provider === 'PayPal') {
-        const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'test'; // Fallback to 'test' if missing
+        const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'test'; 
         loadScript(`https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD`).then(success => {
           if (success && window.paypal && paypalRef.current) {
-            // Render PayPal Buttons
-            // Clear previous buttons if any
             paypalRef.current.innerHTML = "";
             window.paypal.Buttons({
               createOrder: (data, actions) => {
@@ -247,11 +247,31 @@ const App = () => {
   }, [activeModal, bookingStep, paymentConfig]);
 
 
-  const scrollToSection = (sectionId) => {
-    setActiveSection(sectionId);
+  // --- Navigation Logic ---
+  const handleNavClick = (id) => {
     setIsMenuOpen(false);
-    const element = document.getElementById(sectionId);
-    if (element) element.scrollIntoView({ behavior: 'smooth' });
+    
+    // Separate pages
+    if (id === 'about' || id === 'experience') {
+      setActivePage(id);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Home Page & Sections (Services, Testimonials, Contact)
+    if (activePage !== 'home') {
+      setActivePage('home');
+      // Wait for render then scroll
+      setTimeout(() => {
+        const element = document.getElementById(id);
+        if (element) element.scrollIntoView({ behavior: 'smooth' });
+        else window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
+    } else {
+      const element = document.getElementById(id);
+      if (element) element.scrollIntoView({ behavior: 'smooth' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleAdminLogin = (e) => {
@@ -355,14 +375,12 @@ const App = () => {
     setPaymentStatus('success');
     setBookingStep(4);
     
-    // TRACK CONVERSION EVENT
     trackEvent('booking_confirmed', {
         value: paymentConfig.amount,
         currency: paymentConfig.currency,
         provider: paymentConfig.provider
     });
     
-    // Call backend to send email
     if (import.meta.env.PROD) {
       try {
         await fetch('/api/book', {
@@ -385,14 +403,12 @@ const App = () => {
     const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
     if (!keyId) {
-        // Fallback for demo mode without keys
         console.warn("VITE_RAZORPAY_KEY_ID not found. Running in Demo/Simulation mode.");
         await processDemoPayment(paymentConfig, bookingDetails);
         handlePaymentSuccess({ id: "demo_" + Date.now() });
         return;
     }
 
-    // 1. Create Order on Backend
     try {
         const response = await fetch('/api/payment', {
             method: 'POST',
@@ -403,7 +419,6 @@ const App = () => {
 
         if (!orderData.id) throw new Error("Order creation failed");
 
-        // 2. Open Razorpay Modal
         const options = {
             key: keyId,
             amount: orderData.amount,
@@ -426,7 +441,7 @@ const App = () => {
 
         const rzp1 = new window.Razorpay(options);
         rzp1.open();
-        setPaymentStatus('idle'); // Modal opened, status resets to allow retry/cancellation
+        setPaymentStatus('idle');
     } catch (error) {
         logError(error, { context: 'Razorpay Init' });
         setPaymentStatus('error');
@@ -436,7 +451,6 @@ const App = () => {
   const handleSendMessage = (e) => {
     e.preventDefault();
     setFormStatus('sending');
-    // Track form submission attempt
     trackEvent('contact_form_submit');
     setTimeout(() => { 
         setFormStatus('success'); 
@@ -474,8 +488,9 @@ const App = () => {
 
   const navLinks = [
     { name: 'Home', id: 'home' }, { name: 'About', id: 'about' },
+    { name: 'Experience', id: 'experience' },
     { name: 'Services', id: 'services' }, { name: 'Testimonials', id: 'testimonials' },
-    { name: 'Experience', id: 'experience' }, { name: 'Contact', id: 'contact' },
+    { name: 'Contact', id: 'contact' },
   ];
 
   const services = [
@@ -500,12 +515,223 @@ const App = () => {
     setHeroContent(quotes[Math.floor(Math.random() * quotes.length)]);
   }, []);
 
+  // --- Sub-Components (Pages) ---
+  
+  const HomePage = () => (
+    <>
+      {/* Hero */}
+      <section id="home" className="pt-32 pb-20 px-6 bg-stone-50 animate-fade-in">
+        <div className="container mx-auto flex flex-col md:flex-row items-center gap-12">
+          <div className="flex-1 space-y-6">
+            <h1 className="text-5xl font-bold text-slate-900">Compassionate Care for <span className="text-teal-600">Mental Wellness</span></h1>
+            <p className="text-lg text-slate-600">Dedicated to empowering children, adolescents, and adults through evidence-based therapy.</p>
+            <div className="flex gap-4">
+              <button onClick={() => setActiveModal('booking')} className="bg-teal-600 text-white px-8 py-3 rounded-full font-semibold shadow-lg">Book Appointment</button>
+              <button onClick={() => handleNavClick('services')} className="bg-white border text-slate-700 px-8 py-3 rounded-full font-semibold">View Services</button>
+            </div>
+          </div>
+          <div className="flex-1 relative">
+            <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl rotate-2">
+              <img src={heroContent.image} alt="Wellness" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-black/40 flex items-end p-8"><p className="text-white text-lg italic">"{heroContent.text}"</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Services */}
+      <section id="services" className="py-20 px-6 bg-white">
+        <div className="container mx-auto">
+          <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">My Services</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {services.map((service, idx) => (
+              <div key={idx} className="bg-stone-50 p-6 rounded-2xl shadow-sm hover:shadow-xl transition-shadow duration-300 border border-stone-100 group">
+                <div className="bg-white w-16 h-16 rounded-xl flex items-center justify-center mb-6 group-hover:bg-teal-600 transition-colors duration-300 shadow-sm">
+                  <service.Icon className="w-8 h-8 text-teal-600 group-hover:text-white transition-colors" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-3">{service.title}</h3>
+                <p className="text-slate-600 text-sm leading-relaxed mb-6">{service.description}</p>
+                <div className="flex flex-wrap gap-2">{service.tags.map((tag, tIdx) => (<span key={tIdx} className="text-xs font-medium bg-white border border-stone-200 text-stone-600 px-2 py-1 rounded-md">{tag}</span>))}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section id="testimonials" className="py-20 px-6 bg-teal-900 text-white">
+        <div className="container mx-auto max-w-6xl">
+          <h2 className="text-3xl font-bold text-center mb-12">Stories of Growth</h2>
+          <div className="grid md:grid-cols-2 gap-12">
+            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              {reviews.map(r => (
+                <div key={r.id} className="bg-white/10 p-6 rounded-xl border border-white/10 relative group">
+                  <div className="flex justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center text-sm font-bold">{r.name ? r.name.charAt(0) : 'A'}</div>
+                      <span className="font-bold">{r.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="flex text-yellow-400">{[...Array(5)].map((_, i) => (<Star key={i} size={14} fill={i < r.rating ? "currentColor" : "none"} className={i < r.rating ? "" : "text-white/20"} />))}</div>
+                        {isAdmin && <button onClick={(e) => initiateDelete(e, r.id)} className="text-red-300 hover:text-red-100 p-1 transition-colors"><Trash2 size={16} /></button>}
+                    </div>
+                  </div>
+                  <p className="text-sm opacity-90">"{r.text}"</p>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white rounded-2xl p-8 text-slate-800">
+              <h3 className="text-xl font-bold mb-6">Share Your Story</h3>
+              <form onSubmit={handlePostReview} className="space-y-4">
+                <textarea className="w-full px-4 py-3 border rounded-lg" rows="4" placeholder="Your experience..." value={newReview.text} onChange={e => setNewReview({...newReview, text: e.target.value})} required></textarea>
+                <div className="grid grid-cols-2 gap-4">
+                  <input 
+                    className="px-4 py-2 border rounded-lg disabled:bg-gray-100 disabled:text-gray-500" 
+                    placeholder="Name" 
+                    value={newReview.name} 
+                    onChange={e => setNewReview({...newReview, name: e.target.value})} 
+                    disabled={newReview.anonymous}
+                    required={!newReview.anonymous} 
+                  />
+                  <select className="px-4 py-2 border rounded-lg" value={newReview.rating} onChange={e => setNewReview({...newReview, rating: parseInt(e.target.value)})}>
+                    <option value="5">5 Stars</option>
+                    <option value="4">4 Stars</option>
+                    <option value="3">3 Stars</option>
+                    <option value="2">2 Stars</option>
+                    <option value="1">1 Star</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                    <input 
+                        type="checkbox" 
+                        id="anonymous" 
+                        checked={newReview.anonymous} 
+                        onChange={(e) => setNewReview({...newReview, anonymous: e.target.checked, name: e.target.checked ? "" : newReview.name})} 
+                        className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 border-gray-300" 
+                    />
+                    <label htmlFor="anonymous" className="text-sm text-slate-600 select-none cursor-pointer">Post anonymously</label>
+                </div>
+                <button type="submit" disabled={reviewStatus === 'submitting'} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold">
+                  {reviewStatus === 'submitting' ? 'Posting...' : 'Post Review'}
+                </button>
+                {reviewStatus === 'error' && <p className="text-red-500 text-xs mt-2">Could not post review. Please try again.</p>}
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Contact */}
+      <section id="contact" className="py-20 px-6 bg-slate-900 text-white">
+        <div className="container mx-auto max-w-5xl">
+          <div className="grid md:grid-cols-2 gap-16">
+            <div className="space-y-8">
+              <div><h2 className="text-3xl md:text-4xl font-bold mb-4">Start Your Journey Today</h2><div className="w-20 h-1.5 bg-teal-500 rounded-full mb-6"></div><p className="text-slate-300 text-lg">Taking the first step towards mental wellness is a sign of strength. Reach out to schedule a consultation or for any inquiries.</p></div>
+              <div className="space-y-6">
+                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Phone className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Call Me</h3><a href="tel:+918000401045" className="text-slate-300 hover:text-white transition-colors">+91-8000401045</a></div></div>
+                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Mail className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Email Me</h3><a href="mailto:nimishakhandelwal995@gmail.com" className="text-slate-300 hover:text-white transition-colors break-all">nimishakhandelwal995@gmail.com</a></div></div>
+                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><MapPin className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Location</h3><p className="text-slate-300">142 Royal Bungalow, Sukhliya<br />Indore, MP 42010</p></div></div>
+              </div>
+            </div>
+            <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-2xl">
+              <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
+              <form className="space-y-4" onSubmit={handleSendMessage}>
+                <div><label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label><input type="text" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="John Doe" required /></div>
+                <div><label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label><input type="tel" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="+91 XXXXX XXXXX" required /></div>
+                <div><label className="block text-sm font-medium text-slate-700 mb-1">Message</label><textarea rows="4" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all resize-none" placeholder="How can I help you?" required></textarea></div>
+                <button type="submit" disabled={formStatus !== 'idle'} className={`w-full font-bold py-3.5 rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${formStatus === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}>
+                  {formStatus === 'idle' && "Send Message"}
+                  {formStatus === 'sending' && <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Sending...</>}
+                  {formStatus === 'success' && <><CheckCircle className="w-5 h-5" />Message Sent!</>}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+
+  const AboutPage = () => (
+    <section className="pt-32 pb-20 px-6 bg-white min-h-screen animate-fade-in">
+      <div className="container mx-auto max-w-5xl">
+        <div className="text-center mb-16 space-y-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-800">About Me</h2>
+          <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
+          <p className="text-slate-600 max-w-2xl mx-auto">
+            With a strong academic foundation and hands-on experience in clinical and educational settings, I strive to create safe spaces for growth and healing.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-12 items-center">
+          <div className="space-y-6 text-slate-600 leading-relaxed">
+            <p>
+              Hello, I'm <strong className="text-teal-700">Nimisha Khandelwal</strong>, a Counselling Psychologist based in Indore. 
+              I hold a Gold Medal in M.A. Psychology from Mohanlal Sukhadia University and specialized training in Clinical Psychology.
+            </p>
+            <p>
+              My journey includes significant tenure at <span className="font-semibold text-slate-800">Allen Career Institute, Kota</span>, where I supported students through high-pressure academic environments.
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4 mt-6">
+              <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
+                <h4 className="font-bold text-slate-800 mb-1">Education</h4>
+                <p className="text-sm">M.A. Psychology (Gold Medalist)</p>
+                <p className="text-xs text-slate-500 mt-1">Specialization in Clinical Psychology</p>
+              </div>
+              <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
+                <h4 className="font-bold text-slate-800 mb-1">Key Skills</h4>
+                <p className="text-sm">CBT, Reality Therapy, Crisis Intervention</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+             <div className="bg-teal-600 text-white p-8 rounded-2xl shadow-xl">
+               <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                 <Award className="w-6 h-6" /> Certifications
+               </h3>
+               <ul className="space-y-4 text-teal-50">
+                 <li className="flex items-start gap-3">
+                   <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
+                   <span>QPR Gatekeeper Certification</span>
+                 </li>
+                 <li className="flex items-start gap-3">
+                   <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
+                   <span>Choice Theory & Reality Therapy</span>
+                 </li>
+               </ul>
+             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+
+  const ExperiencePage = () => (
+    <section className="pt-32 pb-20 px-6 bg-white min-h-screen animate-fade-in">
+      <div className="container mx-auto max-w-4xl">
+        <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">Professional Journey</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
+        <div className="space-y-12 relative before:absolute before:inset-0 before:ml-5 before:w-0.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:bg-stone-200 before:h-full">
+          {experiences.map((exp, idx) => (
+            <div key={idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-teal-500 text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 absolute left-0 md:left-1/2 translate-x-0"><Calendar size={16} /></div>
+              <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-6 rounded-2xl border border-stone-100 shadow-sm hover:shadow-md transition-shadow ml-16 md:ml-0">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2"><h3 className="font-bold text-lg text-slate-800">{exp.role}</h3><span className="text-xs font-semibold bg-teal-50 text-teal-700 px-2 py-1 rounded-full mt-1 sm:mt-0">{exp.period}</span></div>
+                <div className="text-teal-600 font-medium text-sm mb-3 flex items-center gap-1"><MapPin size={14} /> {exp.org}</div>
+                <p className="text-slate-600 text-sm leading-relaxed">{exp.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+
   return (
     <div className="min-h-screen bg-stone-50 text-slate-800 font-sans selection:bg-teal-100 relative">
-      {/* Tracking Manager - Handles Consent & Init */}
       <TrackingManager />
 
-      {/* Demo Mode Banner */}
       {isDemoMode && (
         <div className="bg-amber-100 border-b border-amber-200 text-amber-900 px-4 py-2 text-sm text-center flex items-center justify-center gap-2 animate-fade-in">
           <Info size={16} />
@@ -513,18 +739,55 @@ const App = () => {
         </div>
       )}
 
-      {/* Privacy Policy Modal */}
+      {/* GDPR Privacy Policy Modal */}
       {activeModal === 'privacy' && (
-        <Modal title="Privacy Policy" icon={Shield} onClose={() => setActiveModal(null)}>
-          <div className="space-y-4 text-sm text-slate-600">
-            <h4 className="font-bold text-slate-800">1. Information Collection</h4>
-            <p>We collect personal information such as your name, email address, and phone number when you book an appointment or contact us. This information is used solely for the purpose of providing counseling services.</p>
+        <Modal title="Privacy Policy (GDPR Compliant)" icon={Shield} onClose={() => setActiveModal(null)}>
+          <div className="space-y-6 text-sm text-slate-600">
+            <p className="italic">Last Updated: {new Date().toLocaleDateString()}</p>
             
-            <h4 className="font-bold text-slate-800">2. Data Usage</h4>
-            <p>Your data is used to schedule appointments, send confirmations, and communicate regarding your sessions. We do not sell or share your personal data with third parties.</p>
+            <section className="space-y-2">
+              <h4 className="font-bold text-slate-800 flex items-center gap-2"><User size={16}/> 1. Data Controller</h4>
+              <p>The entity responsible for the processing of your personal data is <strong>Nimisha Khandelwal</strong>, located in Indore, Madhya Pradesh, India. You may contact us at <a href="mailto:nimishakhandelwal995@gmail.com" className="text-teal-600 underline">nimishakhandelwal995@gmail.com</a>.</p>
+            </section>
 
-            <h4 className="font-bold text-slate-800">3. Confidentiality</h4>
-            <p>All counseling sessions are strictly confidential. Information shared during sessions will not be disclosed without your consent, except where required by law or if there is a risk of harm to yourself or others.</p>
+            <section className="space-y-2">
+              <h4 className="font-bold text-slate-800 flex items-center gap-2"><FileText size={16}/> 2. Data We Collect</h4>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><strong>Personal Identification:</strong> Name, Email Address, Phone Number (provided voluntarily via forms).</li>
+                <li><strong>Payment Information:</strong> Processed securely via Razorpay/PayPal. We do not store full credit card details on our servers.</li>
+                <li><strong>Usage Data:</strong> IP Address, Browser Type, Session Duration (via Cookies/Analytics).</li>
+              </ul>
+            </section>
+
+            <section className="space-y-2">
+              <h4 className="font-bold text-slate-800 flex items-center gap-2"><Brain size={16}/> 3. Purpose & Legal Basis (GDPR Art. 6)</h4>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><strong>Service Provision:</strong> To schedule appointments and provide counseling (Legal Basis: Contractual Necessity).</li>
+                <li><strong>Communication:</strong> To send booking confirmations and respond to inquiries (Legal Basis: Legitimate Interest).</li>
+                <li><strong>Analytics:</strong> To improve website performance (Legal Basis: Consent via Cookie Banner).</li>
+              </ul>
+            </section>
+
+            <section className="space-y-2">
+              <h4 className="font-bold text-slate-800 flex items-center gap-2"><Lock size={16}/> 4. Data Retention & Sharing</h4>
+              <p>We retain personal data only as long as necessary to fulfill the purposes outlined above or to comply with legal obligations. We do not sell your data. Data may be shared with trusted processors (e.g., Vercel, Firebase, Razorpay) under strict confidentiality agreements.</p>
+            </section>
+
+            <section className="space-y-2">
+              <h4 className="font-bold text-slate-800 flex items-center gap-2"><CheckCircle size={16}/> 5. Your Rights</h4>
+              <p>Under GDPR, you have the right to:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><strong>Access:</strong> Request a copy of your personal data.</li>
+                <li><strong>Rectification:</strong> Correct inaccurate data.</li>
+                <li><strong>Erasure:</strong> Request deletion of your data ("Right to be Forgotten").</li>
+                <li><strong>Withdraw Consent:</strong> Opt-out of analytics cookies at any time via the consent manager.</li>
+              </ul>
+            </section>
+
+             <section className="space-y-2">
+              <h4 className="font-bold text-slate-800 flex items-center gap-2"><Cookie size={16}/> 6. Cookies</h4>
+              <p>We use essential cookies for site functionality and optional cookies for analytics (Microsoft Clarity, Google Analytics). You can manage your preferences via the banner at the bottom right of the screen.</p>
+            </section>
           </div>
         </Modal>
       )}
@@ -680,221 +943,40 @@ const App = () => {
       {/* Navigation */}
       <nav className={`fixed ${isDemoMode ? 'top-10' : 'top-0'} w-full bg-white/90 backdrop-blur-md shadow-sm z-50 border-b border-stone-100 transition-all`}>
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2"><Brain className="w-6 h-6 text-teal-600" /><span className="text-xl font-bold text-slate-800">Nimisha Khandelwal</span></div>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleNavClick('home')}>
+             <Brain className="w-6 h-6 text-teal-600" />
+             <span className="text-xl font-bold text-slate-800">Nimisha Khandelwal</span>
+          </div>
           <div className="hidden md:flex gap-8 items-center">
-            {navLinks.map(l => <button key={l.name} onClick={() => scrollToSection(l.id)} className="text-sm font-medium text-slate-600 hover:text-teal-600">{l.name}</button>)}
+            {navLinks.map(l => (
+              <button 
+                key={l.id} 
+                onClick={() => handleNavClick(l.id)} 
+                className={`text-sm font-medium transition-colors ${activePage === l.id ? 'text-teal-600 font-bold' : 'text-slate-600 hover:text-teal-600'}`}
+              >
+                {l.name}
+              </button>
+            ))}
             <button onClick={() => setActiveModal('booking')} className="bg-teal-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:shadow-lg">Book Appointment</button>
           </div>
           <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}><Menu /></button>
         </div>
-        {isMenuOpen && <div className="md:hidden bg-white border-t border-stone-100 absolute w-full shadow-lg p-4 flex flex-col gap-4">{navLinks.map(l => <button key={l.name} onClick={() => scrollToSection(l.id)} className="text-left">{l.name}</button>)}<button onClick={() => setActiveModal('booking')} className="bg-teal-600 text-white py-3 rounded-lg">Book Appointment</button></div>}
+        {isMenuOpen && (
+          <div className="md:hidden bg-white border-t border-stone-100 absolute w-full shadow-lg p-4 flex flex-col gap-4 animate-slide-in">
+            {navLinks.map(l => (
+              <button key={l.id} onClick={() => handleNavClick(l.id)} className="text-left font-medium text-slate-700">
+                {l.name}
+              </button>
+            ))}
+            <button onClick={() => setActiveModal('booking')} className="bg-teal-600 text-white py-3 rounded-lg font-bold">Book Appointment</button>
+          </div>
+        )}
       </nav>
 
-      {/* Hero */}
-      <section id="home" className="pt-32 pb-20 px-6 bg-stone-50">
-        <div className="container mx-auto flex flex-col md:flex-row items-center gap-12">
-          <div className="flex-1 space-y-6">
-            <h1 className="text-5xl font-bold text-slate-900">Compassionate Care for <span className="text-teal-600">Mental Wellness</span></h1>
-            <p className="text-lg text-slate-600">Dedicated to empowering children, adolescents, and adults through evidence-based therapy.</p>
-            <div className="flex gap-4">
-              <button onClick={() => setActiveModal('booking')} className="bg-teal-600 text-white px-8 py-3 rounded-full font-semibold shadow-lg">Book Appointment</button>
-              <button onClick={() => scrollToSection('services')} className="bg-white border text-slate-700 px-8 py-3 rounded-full font-semibold">View Services</button>
-            </div>
-          </div>
-          <div className="flex-1 relative">
-            <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl rotate-2">
-              <img src={heroContent.image} alt="Wellness" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/40 flex items-end p-8"><p className="text-white text-lg italic">"{heroContent.text}"</p></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* About */}
-      <section id="about" className="py-20 px-6 bg-white">
-        <div className="container mx-auto max-w-5xl">
-          <div className="text-center mb-16 space-y-4">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800">About Me</h2>
-            <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
-            <p className="text-slate-600 max-w-2xl mx-auto">
-              With a strong academic foundation and hands-on experience in clinical and educational settings, I strive to create safe spaces for growth and healing.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6 text-slate-600 leading-relaxed">
-              <p>
-                Hello, I'm <strong className="text-teal-700">Nimisha Khandelwal</strong>, a Counselling Psychologist based in Indore. 
-                I hold a Gold Medal in M.A. Psychology from Mohanlal Sukhadia University and specialized training in Clinical Psychology.
-              </p>
-              <p>
-                My journey includes significant tenure at <span className="font-semibold text-slate-800">Allen Career Institute, Kota</span>, where I supported students through high-pressure academic environments.
-              </p>
-              
-              <div className="grid grid-cols-2 gap-4 mt-6">
-                <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
-                  <h4 className="font-bold text-slate-800 mb-1">Education</h4>
-                  <p className="text-sm">M.A. Psychology (Gold Medalist)</p>
-                  <p className="text-xs text-slate-500 mt-1">Specialization in Clinical Psychology</p>
-                </div>
-                <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
-                  <h4 className="font-bold text-slate-800 mb-1">Key Skills</h4>
-                  <p className="text-sm">CBT, Reality Therapy, Crisis Intervention</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-               {/* Certifications Card */}
-               <div className="bg-teal-600 text-white p-8 rounded-2xl shadow-xl">
-                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                   <Award className="w-6 h-6" /> Certifications
-                 </h3>
-                 <ul className="space-y-4 text-teal-50">
-                   <li className="flex items-start gap-3">
-                     <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
-                     <span>QPR Gatekeeper Certification</span>
-                   </li>
-                   <li className="flex items-start gap-3">
-                     <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
-                     <span>Choice Theory & Reality Therapy</span>
-                   </li>
-                 </ul>
-               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section id="testimonials" className="py-20 px-6 bg-teal-900 text-white">
-        <div className="container mx-auto max-w-6xl">
-          <h2 className="text-3xl font-bold text-center mb-12">Stories of Growth</h2>
-          <div className="grid md:grid-cols-2 gap-12">
-            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-              {reviews.map(r => (
-                <div key={r.id} className="bg-white/10 p-6 rounded-xl border border-white/10 relative group">
-                  <div className="flex justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center text-sm font-bold">{r.name ? r.name.charAt(0) : 'A'}</div>
-                      <span className="font-bold">{r.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="flex text-yellow-400">{[...Array(5)].map((_, i) => (<Star key={i} size={14} fill={i < r.rating ? "currentColor" : "none"} className={i < r.rating ? "" : "text-white/20"} />))}</div>
-                        {isAdmin && <button onClick={(e) => initiateDelete(e, r.id)} className="text-red-300 hover:text-red-100 p-1 transition-colors"><Trash2 size={16} /></button>}
-                    </div>
-                  </div>
-                  <p className="text-sm opacity-90">"{r.text}"</p>
-                </div>
-              ))}
-            </div>
-            <div className="bg-white rounded-2xl p-8 text-slate-800">
-              <h3 className="text-xl font-bold mb-6">Share Your Story</h3>
-              <form onSubmit={handlePostReview} className="space-y-4">
-                <textarea className="w-full px-4 py-3 border rounded-lg" rows="4" placeholder="Your experience..." value={newReview.text} onChange={e => setNewReview({...newReview, text: e.target.value})} required></textarea>
-                <div className="grid grid-cols-2 gap-4">
-                  <input 
-                    className="px-4 py-2 border rounded-lg disabled:bg-gray-100 disabled:text-gray-500" 
-                    placeholder="Name" 
-                    value={newReview.name} 
-                    onChange={e => setNewReview({...newReview, name: e.target.value})} 
-                    disabled={newReview.anonymous}
-                    required={!newReview.anonymous} 
-                  />
-                  <select className="px-4 py-2 border rounded-lg" value={newReview.rating} onChange={e => setNewReview({...newReview, rating: parseInt(e.target.value)})}>
-                    <option value="5">5 Stars</option>
-                    <option value="4">4 Stars</option>
-                    <option value="3">3 Stars</option>
-                    <option value="2">2 Stars</option>
-                    <option value="1">1 Star</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                    <input 
-                        type="checkbox" 
-                        id="anonymous" 
-                        checked={newReview.anonymous} 
-                        onChange={(e) => setNewReview({...newReview, anonymous: e.target.checked, name: e.target.checked ? "" : newReview.name})} 
-                        className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 border-gray-300" 
-                    />
-                    <label htmlFor="anonymous" className="text-sm text-slate-600 select-none cursor-pointer">Post anonymously</label>
-                </div>
-                <button type="submit" disabled={reviewStatus === 'submitting'} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold">
-                  {reviewStatus === 'submitting' ? 'Posting...' : 'Post Review'}
-                </button>
-                {reviewStatus === 'error' && <p className="text-red-500 text-xs mt-2">Could not post review. Please try again.</p>}
-              </form>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Experience */}
-      <section id="experience" className="py-20 px-6 bg-white">
-        <div className="container mx-auto max-w-4xl">
-          <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">Professional Journey</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
-          <div className="space-y-12 relative before:absolute before:inset-0 before:ml-5 before:w-0.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:bg-stone-200 before:h-full">
-            {experiences.map((exp, idx) => (
-              <div key={idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-teal-500 text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 absolute left-0 md:left-1/2 translate-x-0"><Calendar size={16} /></div>
-                <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-6 rounded-2xl border border-stone-100 shadow-sm hover:shadow-md transition-shadow ml-16 md:ml-0">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2"><h3 className="font-bold text-lg text-slate-800">{exp.role}</h3><span className="text-xs font-semibold bg-teal-50 text-teal-700 px-2 py-1 rounded-full mt-1 sm:mt-0">{exp.period}</span></div>
-                  <div className="text-teal-600 font-medium text-sm mb-3 flex items-center gap-1"><MapPin size={14} /> {exp.org}</div>
-                  <p className="text-slate-600 text-sm leading-relaxed">{exp.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Services */}
-      <section id="services" className="py-20 px-6 bg-stone-50">
-        <div className="container mx-auto">
-          <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">My Services</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {services.map((service, idx) => (
-              <div key={idx} className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl transition-shadow duration-300 border border-stone-100 group">
-                <div className="bg-teal-50 w-16 h-16 rounded-xl flex items-center justify-center mb-6 group-hover:bg-teal-600 transition-colors duration-300">
-                  <service.Icon className="w-8 h-8 text-teal-600 group-hover:text-white transition-colors" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-3">{service.title}</h3>
-                <p className="text-slate-600 text-sm leading-relaxed mb-6">{service.description}</p>
-                <div className="flex flex-wrap gap-2">{service.tags.map((tag, tIdx) => (<span key={tIdx} className="text-xs font-medium bg-stone-100 text-stone-600 px-2 py-1 rounded-md">{tag}</span>))}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Contact */}
-      <section id="contact" className="py-20 px-6 bg-slate-900 text-white">
-        <div className="container mx-auto max-w-5xl">
-          <div className="grid md:grid-cols-2 gap-16">
-            <div className="space-y-8">
-              <div><h2 className="text-3xl md:text-4xl font-bold mb-4">Start Your Journey Today</h2><div className="w-20 h-1.5 bg-teal-500 rounded-full mb-6"></div><p className="text-slate-300 text-lg">Taking the first step towards mental wellness is a sign of strength. Reach out to schedule a consultation or for any inquiries.</p></div>
-              <div className="space-y-6">
-                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Phone className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Call Me</h3><a href="tel:+918000401045" className="text-slate-300 hover:text-white transition-colors">+91-8000401045</a></div></div>
-                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Mail className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Email Me</h3><a href="mailto:nimishakhandelwal995@gmail.com" className="text-slate-300 hover:text-white transition-colors break-all">nimishakhandelwal995@gmail.com</a></div></div>
-                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><MapPin className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Location</h3><p className="text-slate-300">142 Royal Bungalow, Sukhliya<br />Indore, MP 42010</p></div></div>
-              </div>
-            </div>
-            <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-2xl">
-              <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
-              <form className="space-y-4" onSubmit={handleSendMessage}>
-                <div><label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label><input type="text" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="John Doe" required /></div>
-                <div><label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label><input type="tel" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="+91 XXXXX XXXXX" required /></div>
-                <div><label className="block text-sm font-medium text-slate-700 mb-1">Message</label><textarea rows="4" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all resize-none" placeholder="How can I help you?" required></textarea></div>
-                <button type="submit" disabled={formStatus !== 'idle'} className={`w-full font-bold py-3.5 rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${formStatus === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}>
-                  {formStatus === 'idle' && "Send Message"}
-                  {formStatus === 'sending' && <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Sending...</>}
-                  {formStatus === 'success' && <><CheckCircle className="w-5 h-5" />Message Sent!</>}
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Page Content Rendering */}
+      {activePage === 'home' && <HomePage />}
+      {activePage === 'about' && <AboutPage />}
+      {activePage === 'experience' && <ExperiencePage />}
 
       {/* Footer */}
       <footer className="bg-slate-950 text-slate-400 py-8 border-t border-slate-900">
