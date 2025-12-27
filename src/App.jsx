@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Heart, Brain, BookOpen, Mail, Phone, MapPin, Menu, X, Award, Calendar, 
   User, Users, Smile, ArrowRight, ExternalLink, CheckCircle, Shield, FileText, 
@@ -60,9 +60,9 @@ const Modal = ({ title, children, icon: Icon, onClose, className = "" }) => (
   </div>
 );
 
-// --- Sub-Components ---
+// --- Sub-Components (Defined Outside) ---
 
-const HeroSection = ({ openBookingModal, scrollToSection, heroContent }) => (
+const HeroSection = ({ openBookingModal, handleNavClick, heroContent }) => (
   <section id="home" className="pt-32 pb-20 px-6 bg-stone-50 animate-fade-in min-h-screen flex flex-col justify-center">
       <div className="container mx-auto flex flex-col md:flex-row items-center gap-12">
         <div className="flex-1 space-y-6">
@@ -70,7 +70,7 @@ const HeroSection = ({ openBookingModal, scrollToSection, heroContent }) => (
           <p className="text-lg text-slate-600">Dedicated to empowering children, adolescents, and adults through evidence-based therapy.</p>
           <div className="flex gap-4">
             <button onClick={openBookingModal} className="bg-teal-600 text-white px-8 py-3 rounded-full font-semibold shadow-lg">Book Appointment</button>
-            <button onClick={() => scrollToSection('services')} className="bg-white border text-slate-700 px-8 py-3 rounded-full font-semibold">View Services</button>
+            <button onClick={() => handleNavClick('services')} className="bg-white border text-slate-700 px-8 py-3 rounded-full font-semibold">View Services</button>
           </div>
         </div>
         <div className="flex-1 relative">
@@ -82,90 +82,6 @@ const HeroSection = ({ openBookingModal, scrollToSection, heroContent }) => (
       </div>
   </section>
 );
-
-const AboutSection = () => (
-  <section id="about" className="py-20 px-6 bg-white">
-    <div className="container mx-auto max-w-5xl">
-      <div className="text-center mb-16 space-y-4">
-        <h2 className="text-3xl md:text-4xl font-bold text-slate-800">About Me</h2>
-        <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
-        <p className="text-slate-600 max-w-2xl mx-auto">
-          With a strong academic foundation and hands-on experience in clinical and educational settings, I strive to create safe spaces for growth and healing.
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-12 items-center">
-        <div className="space-y-6 text-slate-600 leading-relaxed">
-          <p>
-            Hello, I'm <strong className="text-teal-700">Nimisha Khandelwal</strong>, a Counselling Psychologist based in Indore. 
-            I hold a Gold Medal in M.A. Psychology from Mohanlal Sukhadia University and specialized training in Clinical Psychology.
-          </p>
-          <p>
-            My journey includes significant tenure at <span className="font-semibold text-slate-800">Allen Career Institute, Kota</span>, where I supported students through high-pressure academic environments.
-          </p>
-          
-          <div className="grid grid-cols-2 gap-4 mt-6">
-            <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
-              <h4 className="font-bold text-slate-800 mb-1">Education</h4>
-              <p className="text-sm">M.A. Psychology (Gold Medalist)</p>
-              <p className="text-xs text-slate-500 mt-1">Specialization in Clinical Psychology</p>
-            </div>
-            <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
-              <h4 className="font-bold text-slate-800 mb-1">Key Skills</h4>
-              <p className="text-sm">CBT, Reality Therapy, Crisis Intervention</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4">
-           <div className="bg-teal-600 text-white p-8 rounded-2xl shadow-xl">
-             <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-               <Award className="w-6 h-6" /> Certifications
-             </h3>
-             <ul className="space-y-4 text-teal-50">
-               <li className="flex items-start gap-3">
-                 <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
-                 <span>QPR Gatekeeper Certification</span>
-               </li>
-               <li className="flex items-start gap-3">
-                 <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
-                 <span>Choice Theory & Reality Therapy</span>
-               </li>
-             </ul>
-           </div>
-        </div>
-      </div>
-    </div>
-  </section>
-);
-
-const ExperienceSection = () => {
-  const experiences = [
-    { role: "Psychological Counsellor", org: "Allen Career Institute, Kota", period: "Sep 2023 - Sep 2024", desc: "Delivered 200+ counselling sessions for high-pressure students." },
-    { role: "Counselling Psychologist", org: "Ujala Centre, RNT Medical College", period: "Feb 2023 - Present", desc: "Providing therapy for children with special needs (ADHD, ID, LD)." },
-    { role: "Volunteer Psychologist", org: "Student Care Alliance Society", period: "May 2024 - Sep 2024", desc: "Conducted 450+ individual and group sessions with aspirants." }
-  ];
-
-  return (
-    <section id="experience" className="py-20 px-6 bg-stone-50">
-      <div className="container mx-auto max-w-4xl">
-        <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">Professional Journey</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
-        <div className="space-y-12 relative before:absolute before:inset-0 before:ml-5 before:w-0.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:bg-stone-200 before:h-full">
-          {experiences.map((exp, idx) => (
-            <div key={idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-teal-500 text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 absolute left-0 md:left-1/2 translate-x-0"><Calendar size={16} /></div>
-              <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-6 rounded-2xl border border-stone-100 shadow-sm hover:shadow-md transition-shadow ml-16 md:ml-0">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2"><h3 className="font-bold text-lg text-slate-800">{exp.role}</h3><span className="text-xs font-semibold bg-teal-50 text-teal-700 px-2 py-1 rounded-full mt-1 sm:mt-0">{exp.period}</span></div>
-                <div className="text-teal-600 font-medium text-sm mb-3 flex items-center gap-1"><MapPin size={14} /> {exp.org}</div>
-                <p className="text-slate-600 text-sm leading-relaxed">{exp.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
 
 const ServicesSection = () => {
   const services = [
@@ -272,6 +188,120 @@ const TestimonialsSection = ({ reviews, isAdmin, initiateDelete, hasBooked, hand
   </section>
 );
 
+const ContactSection = ({ handleSendMessage, formStatus }) => (
+  <section id="contact" className="py-20 px-6 bg-slate-900 text-white">
+      <div className="container mx-auto max-w-5xl">
+        <div className="grid md:grid-cols-2 gap-16">
+          <div className="space-y-8">
+            <div><h2 className="text-3xl md:text-4xl font-bold mb-4">Start Your Journey Today</h2><div className="w-20 h-1.5 bg-teal-500 rounded-full mb-6"></div><p className="text-slate-300 text-lg">Taking the first step towards mental wellness is a sign of strength. Reach out to schedule a consultation or for any inquiries.</p></div>
+            <div className="space-y-6">
+              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Phone className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Call Me</h3><a href="tel:+918000401045" className="text-slate-300 hover:text-white transition-colors">+91-8000401045</a></div></div>
+              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Mail className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Email Me</h3><a href="mailto:nimishakhandelwal995@gmail.com" className="text-slate-300 hover:text-white transition-colors break-all">nimishakhandelwal995@gmail.com</a></div></div>
+              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><MapPin className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Location</h3><p className="text-slate-300">142 Royal Bungalow, Sukhliya<br />Indore, MP 42010</p></div></div>
+            </div>
+          </div>
+          <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-2xl">
+            <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
+            <form className="space-y-4" onSubmit={handleSendMessage}>
+              <div><label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label><input type="text" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="John Doe" required /></div>
+              <div><label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label><input type="tel" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="+91 XXXXX XXXXX" required /></div>
+              <div><label className="block text-sm font-medium text-slate-700 mb-1">Message</label><textarea rows="4" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all resize-none" placeholder="How can I help you?" required></textarea></div>
+              <button type="submit" disabled={formStatus !== 'idle'} className={`w-full font-bold py-3.5 rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${formStatus === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}>
+                {formStatus === 'idle' && "Send Message"}
+                {formStatus === 'sending' && <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Sending...</>}
+                {formStatus === 'success' && <><CheckCircle className="w-5 h-5" />Message Sent!</>}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+  </section>
+);
+
+const AboutSection = () => (
+  <section id="about" className="py-20 px-6 bg-white">
+    <div className="container mx-auto max-w-5xl">
+      <div className="text-center mb-16 space-y-4">
+        <h2 className="text-3xl md:text-4xl font-bold text-slate-800">About Me</h2>
+        <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
+        <p className="text-slate-600 max-w-2xl mx-auto">
+          With a strong academic foundation and hands-on experience in clinical and educational settings, I strive to create safe spaces for growth and healing.
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-12 items-center">
+        <div className="space-y-6 text-slate-600 leading-relaxed">
+          <p>
+            Hello, I'm <strong className="text-teal-700">Nimisha Khandelwal</strong>, a Counselling Psychologist based in Indore. 
+            I hold a Gold Medal in M.A. Psychology from Mohanlal Sukhadia University and specialized training in Clinical Psychology.
+          </p>
+          <p>
+            My journey includes significant tenure at <span className="font-semibold text-slate-800">Allen Career Institute, Kota</span>, where I supported students through high-pressure academic environments.
+          </p>
+          
+          <div className="grid grid-cols-2 gap-4 mt-6">
+            <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
+              <h4 className="font-bold text-slate-800 mb-1">Education</h4>
+              <p className="text-sm">M.A. Psychology (Gold Medalist)</p>
+              <p className="text-xs text-slate-500 mt-1">Specialization in Clinical Psychology</p>
+            </div>
+            <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
+              <h4 className="font-bold text-slate-800 mb-1">Key Skills</h4>
+              <p className="text-sm">CBT, Reality Therapy, Crisis Intervention</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+           <div className="bg-teal-600 text-white p-8 rounded-2xl shadow-xl">
+             <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+               <Award className="w-6 h-6" /> Certifications
+             </h3>
+             <ul className="space-y-4 text-teal-50">
+               <li className="flex items-start gap-3">
+                 <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
+                 <span>QPR Gatekeeper Certification</span>
+               </li>
+               <li className="flex items-start gap-3">
+                 <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
+                 <span>Choice Theory & Reality Therapy</span>
+               </li>
+             </ul>
+           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
+const ExperienceSection = () => {
+  const experiences = [
+    { role: "Psychological Counsellor", org: "Allen Career Institute, Kota", period: "Sep 2023 - Sep 2024", desc: "Delivered 200+ counselling sessions for high-pressure students." },
+    { role: "Counselling Psychologist", org: "Ujala Centre, RNT Medical College", period: "Feb 2023 - Present", desc: "Providing therapy for children with special needs (ADHD, ID, LD)." },
+    { role: "Volunteer Psychologist", org: "Student Care Alliance Society", period: "May 2024 - Sep 2024", desc: "Conducted 450+ individual and group sessions with aspirants." }
+  ];
+
+  return (
+    <section id="experience" className="py-20 px-6 bg-stone-50">
+      <div className="container mx-auto max-w-4xl">
+        <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">Professional Journey</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
+        <div className="space-y-12 relative before:absolute before:inset-0 before:ml-5 before:w-0.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:bg-stone-200 before:h-full">
+          {experiences.map((exp, idx) => (
+            <div key={idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-teal-500 text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 absolute left-0 md:left-1/2 translate-x-0"><Calendar size={16} /></div>
+              <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-6 rounded-2xl border border-stone-100 shadow-sm hover:shadow-md transition-shadow ml-16 md:ml-0">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2"><h3 className="font-bold text-lg text-slate-800">{exp.role}</h3><span className="text-xs font-semibold bg-teal-50 text-teal-700 px-2 py-1 rounded-full mt-1 sm:mt-0">{exp.period}</span></div>
+                <div className="text-teal-600 font-medium text-sm mb-3 flex items-center gap-1"><MapPin size={14} /> {exp.org}</div>
+                <p className="text-slate-600 text-sm leading-relaxed">{exp.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const FAQSection = () => {
   const faqs = [
     { q: "How long is each counselling session?", a: "Standard individual sessions typically last for 50-60 minutes. Initial consultations may be slightly longer to gather comprehensive history." },
@@ -304,39 +334,9 @@ const FAQSection = () => {
   );
 };
 
-const ContactSection = ({ handleSendMessage, formStatus }) => (
-  <section id="contact" className="py-20 px-6 bg-slate-900 text-white">
-      <div className="container mx-auto max-w-5xl">
-        <div className="grid md:grid-cols-2 gap-16">
-          <div className="space-y-8">
-            <div><h2 className="text-3xl md:text-4xl font-bold mb-4">Start Your Journey Today</h2><div className="w-20 h-1.5 bg-teal-500 rounded-full mb-6"></div><p className="text-slate-300 text-lg">Taking the first step towards mental wellness is a sign of strength. Reach out to schedule a consultation or for any inquiries.</p></div>
-            <div className="space-y-6">
-              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Phone className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Call Me</h3><a href="tel:+918000401045" className="text-slate-300 hover:text-white transition-colors">+91-8000401045</a></div></div>
-              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Mail className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Email Me</h3><a href="mailto:nimishakhandelwal995@gmail.com" className="text-slate-300 hover:text-white transition-colors break-all">nimishakhandelwal995@gmail.com</a></div></div>
-              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><MapPin className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Location</h3><p className="text-slate-300">142 Royal Bungalow, Sukhliya<br />Indore, MP 42010</p></div></div>
-            </div>
-          </div>
-          <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-2xl">
-            <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
-            <form className="space-y-4" onSubmit={handleSendMessage}>
-              <div><label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label><input type="text" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="John Doe" required /></div>
-              <div><label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label><input type="tel" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="+91 XXXXX XXXXX" required /></div>
-              <div><label className="block text-sm font-medium text-slate-700 mb-1">Message</label><textarea rows="4" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all resize-none" placeholder="How can I help you?" required></textarea></div>
-              <button type="submit" disabled={formStatus !== 'idle'} className={`w-full font-bold py-3.5 rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${formStatus === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}>
-                {formStatus === 'idle' && "Send Message"}
-                {formStatus === 'sending' && <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Sending...</>}
-                {formStatus === 'success' && <><CheckCircle className="w-5 h-5" />Message Sent!</>}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-  </section>
-);
-
 const App = () => {
   // --- Navigation & Routing State ---
-  const [activePage, setActivePage] = useState('home'); // Unused for rendering now, but kept for active state highlighting if needed
+  const [activePage, setActivePage] = useState('home'); 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // --- Firebase Setup ---
@@ -346,7 +346,6 @@ const App = () => {
   const [appId, setAppId] = useState(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
 
-  // ... (Firebase initialization code remains the same) ...
   useEffect(() => {
     let firebaseConfig = null;
     if (typeof __firebase_config !== 'undefined') {
@@ -400,7 +399,7 @@ const App = () => {
     }
   }, []);
 
-  // Fetch Testimonials - Optimized
+  // Fetch Testimonials
   useEffect(() => {
     if (isDemoMode) {
       setReviews([
@@ -444,7 +443,6 @@ const App = () => {
   const [reviewToDelete, setReviewToDelete] = useState(null);
   const [deleteStatus, setDeleteStatus] = useState('idle');
   
-  // Booking State
   const [bookingStep, setBookingStep] = useState(1); 
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -475,7 +473,6 @@ const App = () => {
     refineLocation();
   }, []);
 
-  // --- Payment Scripts Loading ---
   useEffect(() => {
     if (activeModal === 'booking' && bookingStep === 3) {
       if (paymentConfig.provider === 'Razorpay') {
@@ -506,12 +503,9 @@ const App = () => {
     }
   }, [activeModal, bookingStep, paymentConfig]);
 
-
   // --- Navigation Logic ---
   const handleNavClick = (id) => {
     setIsMenuOpen(false);
-    // Remove setActivePage since we're scrolling on one page
-    // setActivePage(id); 
     const element = document.getElementById(id);
     if (element) {
         element.scrollIntoView({ behavior: 'smooth' });
@@ -520,9 +514,7 @@ const App = () => {
     }
   };
 
-  // --- Automatic Customer Verification Logic ---
   useEffect(() => {
-    // Skip verification if we know user is new
     if (skipVerification) {
         if (bookingDetails.phone && bookingDetails.phone.length >= 7 && (bookingStep === 2)) {
              setCustomerLookupStatus('not-found');
