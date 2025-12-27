@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Heart, Brain, BookOpen, Mail, Phone, MapPin, Menu, X, Award, Calendar, 
   User, Users, Smile, ArrowRight, ExternalLink, CheckCircle, Shield, FileText, 
@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
-  getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, where, getDocs, setDoc, updateDoc 
+  getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, where, getDocs, setDoc, updateDoc, limit 
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import PhoneInput from 'react-phone-input-2';
@@ -135,7 +135,7 @@ const App = () => {
     }
   }, []);
 
-  // Fetch Testimonials
+  // Fetch Testimonials - Optimized
   useEffect(() => {
     if (isDemoMode) {
       setReviews([
@@ -155,7 +155,8 @@ const App = () => {
          collectionRef = collection(db, 'testimonials');
       }
 
-      const q = query(collectionRef, orderBy('createdAt', 'desc'));
+      // Limit initial fetch to 20 for speed, order by desc
+      const q = query(collectionRef, orderBy('createdAt', 'desc'), limit(20));
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const fetchedReviews = snapshot.docs.map(doc => ({
@@ -163,12 +164,8 @@ const App = () => {
           ...doc.data()
         }));
         
-        fetchedReviews.sort((a, b) => {
-            const timeA = a.createdAt?.seconds || 0;
-            const timeB = b.createdAt?.seconds || 0;
-            return timeB - timeA;
-        });
-
+        // Sorting is handled by Firestore query, but double check client side if needed
+        // No need to re-sort if query is correct
         setReviews(fetchedReviews);
       }, (error) => {
         logError(error, { context: 'Fetch Reviews' });
@@ -201,6 +198,8 @@ const App = () => {
   const [paymentStatus, setPaymentStatus] = useState('idle');
   const [paymentConfig, setPaymentConfig] = useState(getPaymentConfig()); 
   const [hasBooked, setHasBooked] = useState(false); // Track if user has completed a booking
+  // New state to skip verification if user came from "Book a Session" button after failed verify
+  const [skipVerification, setSkipVerification] = useState(false);
   const paypalRef = useRef(null);
 
   const [newReview, setNewReview] = useState({ name: '', text: '', rating: 5, anonymous: false });
@@ -261,6 +260,15 @@ const App = () => {
 
   // --- Automatic Customer Verification Logic ---
   useEffect(() => {
+    // Skip this effect if we already know the user is new (skipVerification is true)
+    if (skipVerification) {
+        if (bookingDetails.phone && bookingDetails.phone.length >= 7 && (bookingStep === 2)) {
+             setCustomerLookupStatus('not-found');
+             setIsReturningCustomer(false);
+        }
+        return;
+    }
+
     const verifyPhone = async () => {
         if (!bookingDetails.phone || bookingDetails.phone.length < 7) {
             return;
@@ -310,21 +318,18 @@ const App = () => {
         }
     };
 
-    // Only run verify logic if modal is open and on appropriate step
-    // Using a ref to prevent loops if needed, but dependency array should suffice
     const timeoutId = setTimeout(() => {
-        // Run verify if phone is valid length AND (we are in booking mode OR verification mode)
         if (bookingDetails.phone && bookingDetails.phone.length >= 7 && (bookingStep === 2 || bookingStep === 0)) {
             verifyPhone();
         } else {
-            if (bookingStep !== 0 && bookingStep !== 2) return; // Don't reset if on other steps
+            if (bookingStep !== 0 && bookingStep !== 2) return; 
             setCustomerLookupStatus('idle');
             setIsReturningCustomer(false);
         }
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [bookingDetails.phone, db, appId, isDemoMode, bookingStep]);
+  }, [bookingDetails.phone, db, appId, isDemoMode, bookingStep, skipVerification]);
 
   const validateInputs = () => {
       const errors = {};
@@ -383,10 +388,10 @@ const App = () => {
       if (customerLookupStatus === 'found') {
           // User verified, they can now post testimonials
           setActiveModal(null); // Close modal
-          // Optionally show a toast "Verified successfully!"
       } else if (customerLookupStatus === 'not-found') {
           // User not found, prompt to book
           // Move to booking step 1
+          setSkipVerification(true); // Don't check DB again for this number
           setBookingStep(1);
       }
   };
@@ -395,6 +400,7 @@ const App = () => {
       setBookingStep(0); // 0 = Verify Only Mode
       setBookingDetails({ name: '', email: '', phone: '', country: 'in' });
       setCustomerLookupStatus('idle');
+      setSkipVerification(false);
       setActiveModal('booking');
   };
 
@@ -402,6 +408,7 @@ const App = () => {
       setBookingStep(1); // 1 = Date Selection (Normal Booking Flow)
       setBookingDetails({ name: '', email: '', phone: '', country: 'in' });
       setCustomerLookupStatus('idle');
+      setSkipVerification(false);
       setActiveModal('booking');
   };
 
@@ -599,6 +606,7 @@ const App = () => {
     setIsReturningCustomer(false);
     setPaymentStatus('idle');
     setValidationErrors({});
+    setSkipVerification(false);
   };
 
   const generateDates = () => {
