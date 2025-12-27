@@ -62,7 +62,7 @@ const Modal = ({ title, children, icon: Icon, onClose, className = "" }) => (
 
 const App = () => {
   // --- Navigation & Routing State ---
-  const [activePage, setActivePage] = useState('home'); // 'home', 'about', 'experience', 'faq'
+  const [activePage, setActivePage] = useState('home'); // 'home', 'about', 'experience', 'services', 'testimonials', 'faq', 'contact'
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // --- Firebase Setup ---
@@ -194,8 +194,8 @@ const App = () => {
   const [bookingStep, setBookingStep] = useState(1); 
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'in' }); // Default country India
-  const [customerLookupStatus, setCustomerLookupStatus] = useState('idle'); // 'idle' | 'searching' | 'found' | 'not-found'
+  const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'in' }); 
+  const [customerLookupStatus, setCustomerLookupStatus] = useState('idle'); 
   const [isReturningCustomer, setIsReturningCustomer] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [paymentStatus, setPaymentStatus] = useState('idle');
@@ -254,78 +254,71 @@ const App = () => {
   // --- Navigation Logic ---
   const handleNavClick = (id) => {
     setIsMenuOpen(false);
-    
-    // Separate pages
-    if (id === 'about' || id === 'experience' || id === 'faq') {
-      setActivePage(id);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    if (activePage !== 'home') {
-      setActivePage('home');
-      setTimeout(() => {
-        const element = document.getElementById(id);
-        if (element) element.scrollIntoView({ behavior: 'smooth' });
-        else window.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 100);
-    } else {
-      const element = document.getElementById(id);
-      if (element) element.scrollIntoView({ behavior: 'smooth' });
-      else window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    setActivePage(id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // --- Customer Database Logic ---
-  const checkCustomer = async () => {
-    // Basic length check for international numbers (min 7 digits)
-    if (!bookingDetails.phone || bookingDetails.phone.length < 7) {
-        setValidationErrors(prev => ({ ...prev, phone: "Please enter a valid phone number" }));
-        return;
-    }
-    setValidationErrors(prev => ({ ...prev, phone: null }));
-    setCustomerLookupStatus('searching');
+  // --- Automatic Customer Verification Logic ---
+  useEffect(() => {
+    const verifyPhone = async () => {
+        if (!bookingDetails.phone || bookingDetails.phone.length < 7) {
+            return;
+        }
+        
+        setValidationErrors(prev => ({ ...prev, phone: null }));
+        setCustomerLookupStatus('searching');
 
-    if (isDemoMode) {
-        setTimeout(() => {
-            setCustomerLookupStatus('not-found');
-            setIsReturningCustomer(false);
-        }, 1000);
-        return;
-    }
-
-    try {
-        let collectionRef;
-        if (typeof __app_id !== 'undefined') {
-            collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'customers');
-        } else {
-            collectionRef = collection(db, 'customers');
+        if (isDemoMode) {
+            setTimeout(() => {
+                setCustomerLookupStatus('not-found');
+                setIsReturningCustomer(false);
+            }, 800);
+            return;
         }
 
-        const q = query(collectionRef, where('phone', '==', bookingDetails.phone));
-        const querySnapshot = await getDocs(q);
+        try {
+            let collectionRef;
+            if (typeof __app_id !== 'undefined') {
+                collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'customers');
+            } else {
+                collectionRef = collection(db, 'customers');
+            }
 
-        if (!querySnapshot.empty) {
-            const customerData = querySnapshot.docs[0].data();
-            // Store details in state but DON'T display in inputs (isReturningCustomer = true hides fields)
-            setBookingDetails(prev => ({
-                ...prev,
-                name: customerData.name || '',
-                email: customerData.email || '',
-                country: customerData.country || 'in'
-            }));
-            setCustomerLookupStatus('found');
-            setIsReturningCustomer(true);
-        } else {
+            const q = query(collectionRef, where('phone', '==', bookingDetails.phone));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                const customerData = querySnapshot.docs[0].data();
+                setBookingDetails(prev => ({
+                    ...prev,
+                    name: customerData.name || '',
+                    email: customerData.email || '',
+                    country: customerData.country || 'in'
+                }));
+                setCustomerLookupStatus('found');
+                setIsReturningCustomer(true);
+            } else {
+                setCustomerLookupStatus('not-found');
+                setIsReturningCustomer(false);
+            }
+        } catch (e) {
+            console.error("Error looking up customer", e);
             setCustomerLookupStatus('not-found');
             setIsReturningCustomer(false);
         }
-    } catch (e) {
-        console.error("Error looking up customer", e);
-        setCustomerLookupStatus('not-found');
-        setIsReturningCustomer(false);
-    }
-  };
+    };
+
+    const timeoutId = setTimeout(() => {
+        if (bookingDetails.phone && bookingDetails.phone.length >= 7) {
+            verifyPhone();
+        } else {
+            setCustomerLookupStatus('idle');
+            setIsReturningCustomer(false);
+        }
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [bookingDetails.phone, db, appId, isDemoMode]);
 
   const validateInputs = () => {
       const errors = {};
@@ -355,13 +348,11 @@ const App = () => {
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
-            // Update timestamp only
             const docRef = querySnapshot.docs[0].ref;
             await updateDoc(docRef, {
                 lastBooking: serverTimestamp()
             });
         } else {
-            // Create new
             await addDoc(collectionRef, {
                 phone: bookingDetails.phone,
                 name: bookingDetails.name,
@@ -637,9 +628,7 @@ const App = () => {
   // --- Sub-Components (Pages) ---
   
   const HomePage = () => (
-    <>
-      {/* Hero */}
-      <section id="home" className="pt-32 pb-20 px-6 bg-stone-50 animate-fade-in">
+    <section className="pt-32 pb-20 px-6 bg-stone-50 animate-fade-in min-h-screen flex flex-col justify-center">
         <div className="container mx-auto flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 space-y-6">
             <h1 className="text-5xl font-bold text-slate-900">Compassionate Care for <span className="text-teal-600">Mental Wellness</span></h1>
@@ -656,10 +645,11 @@ const App = () => {
             </div>
           </div>
         </div>
-      </section>
+    </section>
+  );
 
-      {/* Services */}
-      <section id="services" className="py-20 px-6 bg-white">
+  const ServicesPage = () => (
+    <section className="pt-32 pb-20 px-6 bg-white min-h-screen animate-fade-in">
         <div className="container mx-auto">
           <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">My Services</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -675,10 +665,11 @@ const App = () => {
             ))}
           </div>
         </div>
-      </section>
+    </section>
+  );
 
-      {/* Testimonials */}
-      <section id="testimonials" className="py-20 px-6 bg-teal-900 text-white">
+  const TestimonialsPage = () => (
+    <section className="pt-32 pb-20 px-6 bg-teal-900 text-white min-h-screen animate-fade-in">
         <div className="container mx-auto max-w-6xl">
           <h2 className="text-3xl font-bold text-center mb-12">Stories of Growth</h2>
           <div className="grid md:grid-cols-2 gap-12">
@@ -738,10 +729,11 @@ const App = () => {
             </div>
           </div>
         </div>
-      </section>
+    </section>
+  );
 
-      {/* Contact */}
-      <section id="contact" className="py-20 px-6 bg-slate-900 text-white">
+  const ContactPage = () => (
+    <section className="pt-32 pb-20 px-6 bg-slate-900 text-white min-h-screen animate-fade-in">
         <div className="container mx-auto max-w-5xl">
           <div className="grid md:grid-cols-2 gap-16">
             <div className="space-y-8">
@@ -767,8 +759,7 @@ const App = () => {
             </div>
           </div>
         </div>
-      </section>
-    </>
+    </section>
   );
 
   const AboutPage = () => (
@@ -1011,13 +1002,13 @@ const App = () => {
                      />
                    </div>
                    <button 
-                      onClick={checkCustomer} 
-                      disabled={!bookingDetails.phone || bookingDetails.phone.length < 5 || customerLookupStatus === 'searching' || customerLookupStatus === 'found'}
-                      className="bg-slate-800 text-white px-4 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                      onClick={() => { /* Removing manual button, logic is handled by useEffect */ }}
+                      className="hidden" // Hiding button as per request
                    >
-                      {customerLookupStatus === 'searching' ? <Loader className="animate-spin w-4 h-4"/> : 'Verify'}
                    </button>
                  </div>
+                 {/* Show loading indicator or status next to input if needed, or rely on useEffect logic */}
+                 {customerLookupStatus === 'searching' && <p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><Loader className="animate-spin w-3 h-3"/> Verifying...</p>}
                  {validationErrors.phone && <p className="text-red-500 text-xs mt-1">{validationErrors.phone}</p>}
               </div>
               
@@ -1180,7 +1171,10 @@ const App = () => {
       {activePage === 'home' && <HomePage />}
       {activePage === 'about' && <AboutPage />}
       {activePage === 'experience' && <ExperiencePage />}
+      {activePage === 'services' && <ServicesPage />}
+      {activePage === 'testimonials' && <TestimonialsPage />}
       {activePage === 'faq' && <FAQPage />}
+      {activePage === 'contact' && <ContactPage />}
 
       {/* Footer */}
       <footer className="bg-slate-950 text-slate-400 py-8 border-t border-slate-900">
