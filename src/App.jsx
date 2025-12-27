@@ -60,9 +60,283 @@ const Modal = ({ title, children, icon: Icon, onClose, className = "" }) => (
   </div>
 );
 
+// --- Sub-Components ---
+
+const HeroSection = ({ openBookingModal, scrollToSection, heroContent }) => (
+  <section id="home" className="pt-32 pb-20 px-6 bg-stone-50 animate-fade-in min-h-screen flex flex-col justify-center">
+      <div className="container mx-auto flex flex-col md:flex-row items-center gap-12">
+        <div className="flex-1 space-y-6">
+          <h1 className="text-5xl font-bold text-slate-900">Compassionate Care for <span className="text-teal-600">Mental Wellness</span></h1>
+          <p className="text-lg text-slate-600">Dedicated to empowering children, adolescents, and adults through evidence-based therapy.</p>
+          <div className="flex gap-4">
+            <button onClick={openBookingModal} className="bg-teal-600 text-white px-8 py-3 rounded-full font-semibold shadow-lg">Book Appointment</button>
+            <button onClick={() => scrollToSection('services')} className="bg-white border text-slate-700 px-8 py-3 rounded-full font-semibold">View Services</button>
+          </div>
+        </div>
+        <div className="flex-1 relative">
+          <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl rotate-2">
+            <img src={heroContent.image} alt="Wellness" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/40 flex items-end p-8"><p className="text-white text-lg italic">"{heroContent.text}"</p></div>
+          </div>
+        </div>
+      </div>
+  </section>
+);
+
+const AboutSection = () => (
+  <section id="about" className="py-20 px-6 bg-white">
+    <div className="container mx-auto max-w-5xl">
+      <div className="text-center mb-16 space-y-4">
+        <h2 className="text-3xl md:text-4xl font-bold text-slate-800">About Me</h2>
+        <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
+        <p className="text-slate-600 max-w-2xl mx-auto">
+          With a strong academic foundation and hands-on experience in clinical and educational settings, I strive to create safe spaces for growth and healing.
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-12 items-center">
+        <div className="space-y-6 text-slate-600 leading-relaxed">
+          <p>
+            Hello, I'm <strong className="text-teal-700">Nimisha Khandelwal</strong>, a Counselling Psychologist based in Indore. 
+            I hold a Gold Medal in M.A. Psychology from Mohanlal Sukhadia University and specialized training in Clinical Psychology.
+          </p>
+          <p>
+            My journey includes significant tenure at <span className="font-semibold text-slate-800">Allen Career Institute, Kota</span>, where I supported students through high-pressure academic environments.
+          </p>
+          
+          <div className="grid grid-cols-2 gap-4 mt-6">
+            <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
+              <h4 className="font-bold text-slate-800 mb-1">Education</h4>
+              <p className="text-sm">M.A. Psychology (Gold Medalist)</p>
+              <p className="text-xs text-slate-500 mt-1">Specialization in Clinical Psychology</p>
+            </div>
+            <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
+              <h4 className="font-bold text-slate-800 mb-1">Key Skills</h4>
+              <p className="text-sm">CBT, Reality Therapy, Crisis Intervention</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+           <div className="bg-teal-600 text-white p-8 rounded-2xl shadow-xl">
+             <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+               <Award className="w-6 h-6" /> Certifications
+             </h3>
+             <ul className="space-y-4 text-teal-50">
+               <li className="flex items-start gap-3">
+                 <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
+                 <span>QPR Gatekeeper Certification</span>
+               </li>
+               <li className="flex items-start gap-3">
+                 <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
+                 <span>Choice Theory & Reality Therapy</span>
+               </li>
+             </ul>
+           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
+const ExperienceSection = () => {
+  const experiences = [
+    { role: "Psychological Counsellor", org: "Allen Career Institute, Kota", period: "Sep 2023 - Sep 2024", desc: "Delivered 200+ counselling sessions for high-pressure students." },
+    { role: "Counselling Psychologist", org: "Ujala Centre, RNT Medical College", period: "Feb 2023 - Present", desc: "Providing therapy for children with special needs (ADHD, ID, LD)." },
+    { role: "Volunteer Psychologist", org: "Student Care Alliance Society", period: "May 2024 - Sep 2024", desc: "Conducted 450+ individual and group sessions with aspirants." }
+  ];
+
+  return (
+    <section id="experience" className="py-20 px-6 bg-stone-50">
+      <div className="container mx-auto max-w-4xl">
+        <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">Professional Journey</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
+        <div className="space-y-12 relative before:absolute before:inset-0 before:ml-5 before:w-0.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:bg-stone-200 before:h-full">
+          {experiences.map((exp, idx) => (
+            <div key={idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-teal-500 text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 absolute left-0 md:left-1/2 translate-x-0"><Calendar size={16} /></div>
+              <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-6 rounded-2xl border border-stone-100 shadow-sm hover:shadow-md transition-shadow ml-16 md:ml-0">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2"><h3 className="font-bold text-lg text-slate-800">{exp.role}</h3><span className="text-xs font-semibold bg-teal-50 text-teal-700 px-2 py-1 rounded-full mt-1 sm:mt-0">{exp.period}</span></div>
+                <div className="text-teal-600 font-medium text-sm mb-3 flex items-center gap-1"><MapPin size={14} /> {exp.org}</div>
+                <p className="text-slate-600 text-sm leading-relaxed">{exp.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const ServicesSection = () => {
+  const services = [
+    { title: "Child & Adolescent Therapy", Icon: Smile, description: "Specialized support for ADHD, Autism, and behavioral challenges.", tags: ["ADHD", "ASD"] },
+    { title: "Student & Exam Stress", Icon: BookOpen, description: "Expert guidance for exam anxiety and academic pressure.", tags: ["Anxiety", "Focus"] },
+    { title: "Individual Counselling", Icon: User, description: "Therapy for depression, trauma, and relationships.", tags: ["Depression", "Trauma"] },
+    { title: "Parenting Guidance", Icon: Users, description: "Strategies to support children's mental health.", tags: ["Family", "Psychoeducation"] }
+  ];
+
+  return (
+    <section id="services" className="py-20 px-6 bg-white">
+        <div className="container mx-auto">
+          <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">My Services</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {services.map((service, idx) => (
+              <div key={idx} className="bg-stone-50 p-6 rounded-2xl shadow-sm hover:shadow-xl transition-shadow duration-300 border border-stone-100 group">
+                <div className="bg-white w-16 h-16 rounded-xl flex items-center justify-center mb-6 group-hover:bg-teal-600 transition-colors duration-300 shadow-sm">
+                  <service.Icon className="w-8 h-8 text-teal-600 group-hover:text-white transition-colors" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-3">{service.title}</h3>
+                <p className="text-slate-600 text-sm leading-relaxed mb-6">{service.description}</p>
+                <div className="flex flex-wrap gap-2">{service.tags.map((tag, tIdx) => (<span key={tIdx} className="text-xs font-medium bg-white border border-stone-200 text-stone-600 px-2 py-1 rounded-md">{tag}</span>))}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+    </section>
+  );
+};
+
+const TestimonialsSection = ({ reviews, isAdmin, initiateDelete, hasBooked, handlePostReview, newReview, setNewReview, reviewStatus, openVerifyModal }) => (
+  <section id="testimonials" className="py-20 px-6 bg-teal-900 text-white">
+      <div className="container mx-auto max-w-6xl">
+        <h2 className="text-3xl font-bold text-center mb-12">Stories of Growth</h2>
+        <div className="grid md:grid-cols-2 gap-12">
+          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+            {reviews.map(r => (
+              <div key={r.id} className="bg-white/10 p-6 rounded-xl border border-white/10 relative group">
+                <div className="flex justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center text-sm font-bold">{r.name ? r.name.charAt(0) : 'A'}</div>
+                    <span className="font-bold">{r.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <div className="flex text-yellow-400">{[...Array(5)].map((_, i) => (<Star key={i} size={14} fill={i < r.rating ? "currentColor" : "none"} className={i < r.rating ? "" : "text-white/20"} />))}</div>
+                      {isAdmin && <button onClick={(e) => initiateDelete(e, r.id)} className="text-red-300 hover:text-red-100 p-1 transition-colors"><Trash2 size={16} /></button>}
+                  </div>
+                </div>
+                <p className="text-sm opacity-90">"{r.text}"</p>
+              </div>
+            ))}
+          </div>
+          <div className="bg-white rounded-2xl p-8 text-slate-800">
+            <h3 className="text-xl font-bold mb-6">Share Your Story</h3>
+            
+            {hasBooked ? (
+              <form onSubmit={handlePostReview} className="space-y-4 animate-fade-in">
+                <textarea className="w-full px-4 py-3 border rounded-lg" rows="4" placeholder="Your experience..." value={newReview.text} onChange={e => setNewReview({...newReview, text: e.target.value})} required></textarea>
+                <div className="grid grid-cols-2 gap-4">
+                  <input 
+                    className="px-4 py-2 border rounded-lg disabled:bg-gray-100 disabled:text-gray-500" 
+                    placeholder="Name" 
+                    value={newReview.name} 
+                    onChange={e => setNewReview({...newReview, name: e.target.value})} 
+                    disabled={newReview.anonymous}
+                    required={!newReview.anonymous} 
+                  />
+                  <select className="px-4 py-2 border rounded-lg" value={newReview.rating} onChange={e => setNewReview({...newReview, rating: parseInt(e.target.value)})}>
+                    <option value="5">5 Stars</option>
+                    <option value="4">4 Stars</option>
+                    <option value="3">3 Stars</option>
+                    <option value="2">2 Stars</option>
+                    <option value="1">1 Star</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                    <input 
+                        type="checkbox" 
+                        id="anonymous" 
+                        checked={newReview.anonymous} 
+                        onChange={(e) => setNewReview({...newReview, anonymous: e.target.checked, name: e.target.checked ? "" : newReview.name})} 
+                        className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 border-gray-300" 
+                    />
+                    <label htmlFor="anonymous" className="text-sm text-slate-600 select-none cursor-pointer">Post anonymously</label>
+                </div>
+                <button type="submit" disabled={reviewStatus === 'submitting'} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold">
+                  {reviewStatus === 'submitting' ? 'Posting...' : 'Post Review'}
+                </button>
+                {reviewStatus === 'error' && <p className="text-red-500 text-xs mt-2">Could not post review. Please try again.</p>}
+              </form>
+            ) : (
+              <div className="text-center py-8 bg-stone-50 rounded-xl border border-stone-200">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-teal-100 text-teal-600 rounded-full mb-3">
+                  <Lock size={20} />
+                </div>
+                <h4 className="font-bold text-slate-700 mb-2">Verified Customers Only</h4>
+                <p className="text-sm text-slate-500 mb-4 px-6">To maintain authenticity, only clients who have completed a booking can share their experience.</p>
+                <button onClick={openVerifyModal} className="text-teal-600 font-semibold text-sm hover:underline">Verify your number or book a session</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+  </section>
+);
+
+const FAQSection = () => {
+  const faqs = [
+    { q: "How long is each counselling session?", a: "Standard individual sessions typically last for 50-60 minutes. Initial consultations may be slightly longer to gather comprehensive history." },
+    { q: "Is my information kept confidential?", a: "Absolutely. Confidentiality is a cornerstone of therapy. Your information is never shared without your consent, except in rare legal circumstances or if there is an immediate risk of harm." },
+    { q: "Do you offer online sessions?", a: "Yes, I offer secure online video consultations for clients who prefer to meet remotely or are located outside of Indore." },
+    { q: "What is your cancellation policy?", a: "I request at least 24 hours' notice for cancellations. Missed appointments without prior notice may be subject to a cancellation fee." },
+    { q: "How do I know if therapy is right for me?", a: "Therapy provides a safe space to explore feelings and develop coping strategies. If you're feeling overwhelmed, stuck, or just want to understand yourself better, therapy can be very beneficial." }
+  ];
+
+  return (
+    <section id="faq" className="py-20 px-6 bg-white">
+        <div className="container mx-auto max-w-3xl">
+            <div className="text-center mb-16 space-y-4">
+                <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Frequently Asked Questions</h2>
+                <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
+            </div>
+            <div className="space-y-6">
+                {faqs.map((faq, i) => (
+                    <div key={i} className="border border-stone-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+                        <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                           <HelpCircle className="w-5 h-5 text-teal-600" />
+                           {faq.q}
+                        </h3>
+                        <p className="text-slate-600 leading-relaxed ml-7">{faq.a}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    </section>
+  );
+};
+
+const ContactSection = ({ handleSendMessage, formStatus }) => (
+  <section id="contact" className="py-20 px-6 bg-slate-900 text-white">
+      <div className="container mx-auto max-w-5xl">
+        <div className="grid md:grid-cols-2 gap-16">
+          <div className="space-y-8">
+            <div><h2 className="text-3xl md:text-4xl font-bold mb-4">Start Your Journey Today</h2><div className="w-20 h-1.5 bg-teal-500 rounded-full mb-6"></div><p className="text-slate-300 text-lg">Taking the first step towards mental wellness is a sign of strength. Reach out to schedule a consultation or for any inquiries.</p></div>
+            <div className="space-y-6">
+              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Phone className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Call Me</h3><a href="tel:+918000401045" className="text-slate-300 hover:text-white transition-colors">+91-8000401045</a></div></div>
+              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Mail className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Email Me</h3><a href="mailto:nimishakhandelwal995@gmail.com" className="text-slate-300 hover:text-white transition-colors break-all">nimishakhandelwal995@gmail.com</a></div></div>
+              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><MapPin className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Location</h3><p className="text-slate-300">142 Royal Bungalow, Sukhliya<br />Indore, MP 42010</p></div></div>
+            </div>
+          </div>
+          <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-2xl">
+            <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
+            <form className="space-y-4" onSubmit={handleSendMessage}>
+              <div><label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label><input type="text" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="John Doe" required /></div>
+              <div><label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label><input type="tel" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="+91 XXXXX XXXXX" required /></div>
+              <div><label className="block text-sm font-medium text-slate-700 mb-1">Message</label><textarea rows="4" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all resize-none" placeholder="How can I help you?" required></textarea></div>
+              <button type="submit" disabled={formStatus !== 'idle'} className={`w-full font-bold py-3.5 rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${formStatus === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}>
+                {formStatus === 'idle' && "Send Message"}
+                {formStatus === 'sending' && <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Sending...</>}
+                {formStatus === 'success' && <><CheckCircle className="w-5 h-5" />Message Sent!</>}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+  </section>
+);
+
 const App = () => {
   // --- Navigation & Routing State ---
-  const [activePage, setActivePage] = useState('home'); // 'home', 'about', 'experience', 'faq'
+  const [activePage, setActivePage] = useState('home'); // Unused for rendering now, but kept for active state highlighting if needed
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // --- Firebase Setup ---
@@ -72,17 +346,14 @@ const App = () => {
   const [appId, setAppId] = useState(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
 
+  // ... (Firebase initialization code remains the same) ...
   useEffect(() => {
     let firebaseConfig = null;
-
-    // 1. Try Global Config (Internal Envs)
     if (typeof __firebase_config !== 'undefined') {
       try {
         firebaseConfig = JSON.parse(__firebase_config);
       } catch (e) { logError(e, { context: 'JSON Parse Global Config' }); }
     }
-    
-    // 2. Try Standard Vite Environment Variables (Vercel)
     if (!firebaseConfig && import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) {
       firebaseConfig = {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -93,24 +364,19 @@ const App = () => {
         appId: import.meta.env.VITE_FIREBASE_APP_ID
       };
     }
-
-    // 3. Fallback to Demo Mode if no config found
     if (!firebaseConfig) {
       console.warn("No Firebase configuration found. Starting in Demo Mode.");
       setIsDemoMode(true);
       return;
     }
-
     try {
       const app = initializeApp(firebaseConfig);
       const auth = getAuth(app);
       const firestore = getFirestore(app);
       setDb(firestore);
-      
       const rawId = typeof __app_id !== 'undefined' ? __app_id : 'nimisha-portfolio-prod';
       const sanitizedId = encodeURIComponent(rawId);
       setAppId(sanitizedId);
-
       const initAuth = async () => {
         try {
           if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -124,7 +390,6 @@ const App = () => {
         }
       };
       initAuth();
-
       const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
         setUser(u);
       });
@@ -144,9 +409,7 @@ const App = () => {
       ]);
       return;
     }
-
     if (!user || !db || !appId) return;
-
     try {
       let collectionRef;
       if (typeof __app_id !== 'undefined') {
@@ -154,18 +417,12 @@ const App = () => {
       } else {
          collectionRef = collection(db, 'testimonials');
       }
-
-      // Limit initial fetch to 20 for speed, order by desc
       const q = query(collectionRef, orderBy('createdAt', 'desc'), limit(20));
-      
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const fetchedReviews = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
-        
-        // Sorting is handled by Firestore query, but double check client side if needed
-        // No need to re-sort if query is correct
         setReviews(fetchedReviews);
       }, (error) => {
         logError(error, { context: 'Fetch Reviews' });
@@ -191,14 +448,13 @@ const App = () => {
   const [bookingStep, setBookingStep] = useState(1); 
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'in' }); // Default country India
-  const [customerLookupStatus, setCustomerLookupStatus] = useState('idle'); // 'idle' | 'searching' | 'found' | 'not-found'
+  const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'in' }); 
+  const [customerLookupStatus, setCustomerLookupStatus] = useState('idle'); 
   const [isReturningCustomer, setIsReturningCustomer] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [paymentStatus, setPaymentStatus] = useState('idle');
   const [paymentConfig, setPaymentConfig] = useState(getPaymentConfig()); 
-  const [hasBooked, setHasBooked] = useState(false); // Track if user has completed a booking
-  // New state to skip verification if user came from "Book a Session" button after failed verify
+  const [hasBooked, setHasBooked] = useState(false); 
   const [skipVerification, setSkipVerification] = useState(false);
   const paypalRef = useRef(null);
 
@@ -254,13 +510,19 @@ const App = () => {
   // --- Navigation Logic ---
   const handleNavClick = (id) => {
     setIsMenuOpen(false);
-    setActivePage(id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Remove setActivePage since we're scrolling on one page
+    // setActivePage(id); 
+    const element = document.getElementById(id);
+    if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   // --- Automatic Customer Verification Logic ---
   useEffect(() => {
-    // Skip this effect if we already know the user is new (skipVerification is true)
+    // Skip verification if we know user is new
     if (skipVerification) {
         if (bookingDetails.phone && bookingDetails.phone.length >= 7 && (bookingStep === 2)) {
              setCustomerLookupStatus('not-found');
@@ -270,9 +532,7 @@ const App = () => {
     }
 
     const verifyPhone = async () => {
-        if (!bookingDetails.phone || bookingDetails.phone.length < 7) {
-            return;
-        }
+        if (!bookingDetails.phone || bookingDetails.phone.length < 7) return;
         
         setValidationErrors(prev => ({ ...prev, phone: null }));
         setCustomerLookupStatus('searching');
@@ -306,7 +566,7 @@ const App = () => {
                 }));
                 setCustomerLookupStatus('found');
                 setIsReturningCustomer(true);
-                setHasBooked(true); // Allow returning customers to post testimonials
+                setHasBooked(true); 
             } else {
                 setCustomerLookupStatus('not-found');
                 setIsReturningCustomer(false);
@@ -386,18 +646,15 @@ const App = () => {
 
   const handleVerifyOnly = () => {
       if (customerLookupStatus === 'found') {
-          // User verified, they can now post testimonials
-          setActiveModal(null); // Close modal
+          setActiveModal(null); 
       } else if (customerLookupStatus === 'not-found') {
-          // User not found, prompt to book
-          // Move to booking step 1
-          setSkipVerification(true); // Don't check DB again for this number
+          setSkipVerification(true); 
           setBookingStep(1);
       }
   };
 
   const openVerifyModal = () => {
-      setBookingStep(0); // 0 = Verify Only Mode
+      setBookingStep(0); 
       setBookingDetails({ name: '', email: '', phone: '', country: 'in' });
       setCustomerLookupStatus('idle');
       setSkipVerification(false);
@@ -405,7 +662,7 @@ const App = () => {
   };
 
   const openBookingModal = () => {
-      setBookingStep(1); // 1 = Date Selection (Normal Booking Flow)
+      setBookingStep(1); 
       setBookingDetails({ name: '', email: '', phone: '', country: 'in' });
       setCustomerLookupStatus('idle');
       setSkipVerification(false);
@@ -511,7 +768,7 @@ const App = () => {
   const handlePaymentSuccess = async (details) => {
     setPaymentStatus('success');
     setBookingStep(4);
-    setHasBooked(true); // Allow posting testimonials
+    setHasBooked(true); 
     
     trackEvent('booking_confirmed', {
         value: paymentConfig.amount,
@@ -635,284 +892,6 @@ const App = () => {
     { name: 'FAQ', id: 'faq' },
     { name: 'Contact', id: 'contact' },
   ];
-
-  const services = [
-    { title: "Child & Adolescent Therapy", Icon: Smile, description: "Specialized support for ADHD, Autism, and behavioral challenges.", tags: ["ADHD", "ASD"] },
-    { title: "Student & Exam Stress", Icon: BookOpen, description: "Expert guidance for exam anxiety and academic pressure.", tags: ["Anxiety", "Focus"] },
-    { title: "Individual Counselling", Icon: User, description: "Therapy for depression, trauma, and relationships.", tags: ["Depression", "Trauma"] },
-    { title: "Parenting Guidance", Icon: Users, description: "Strategies to support children's mental health.", tags: ["Family", "Psychoeducation"] }
-  ];
-
-  const experiences = [
-    { role: "Psychological Counsellor", org: "Allen Career Institute, Kota", period: "Sep 2023 - Sep 2024", desc: "Delivered 200+ counselling sessions for high-pressure students." },
-    { role: "Counselling Psychologist", org: "Ujala Centre, RNT Medical College", period: "Feb 2023 - Present", desc: "Providing therapy for children with special needs (ADHD, ID, LD)." },
-    { role: "Volunteer Psychologist", org: "Student Care Alliance Society", period: "May 2024 - Sep 2024", desc: "Conducted 450+ individual and group sessions with aspirants." }
-  ];
-
-  const faqs = [
-    { q: "How long is each counselling session?", a: "Standard individual sessions typically last for 50-60 minutes. Initial consultations may be slightly longer to gather comprehensive history." },
-    { q: "Is my information kept confidential?", a: "Absolutely. Confidentiality is a cornerstone of therapy. Your information is never shared without your consent, except in rare legal circumstances or if there is an immediate risk of harm." },
-    { q: "Do you offer online sessions?", a: "Yes, I offer secure online video consultations for clients who prefer to meet remotely or are located outside of Indore." },
-    { q: "What is your cancellation policy?", a: "I request at least 24 hours' notice for cancellations. Missed appointments without prior notice may be subject to a cancellation fee." },
-    { q: "How do I know if therapy is right for me?", a: "Therapy provides a safe space to explore feelings and develop coping strategies. If you're feeling overwhelmed, stuck, or just want to understand yourself better, therapy can be very beneficial." }
-  ];
-
-  useEffect(() => {
-    const quotes = [
-      { text: "Empowering youth through mental health support.", image: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&fit=crop&q=80&w=800", blob1: "bg-teal-200/30", blob2: "bg-purple-200/30" },
-      { text: "Your mental health is just as important as your physical health.", image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=800", blob1: "bg-blue-300/30", blob2: "bg-sky-200/30" },
-      { text: "Small steps every day add up to big results.", image: "https://images.unsplash.com/photo-1457530378978-8bac673b8062?auto=format&fit=crop&q=80&w=800", blob1: "bg-rose-300/30", blob2: "bg-pink-200/30" }
-    ];
-    setHeroContent(quotes[Math.floor(Math.random() * quotes.length)]);
-  }, []);
-
-  // --- Sub-Components (Pages) ---
-  
-  const HomePage = () => (
-    <>
-      {/* Hero */}
-      <section id="home" className="pt-32 pb-20 px-6 bg-stone-50 animate-fade-in">
-        <div className="container mx-auto flex flex-col md:flex-row items-center gap-12">
-          <div className="flex-1 space-y-6">
-            <h1 className="text-5xl font-bold text-slate-900">Compassionate Care for <span className="text-teal-600">Mental Wellness</span></h1>
-            <p className="text-lg text-slate-600">Dedicated to empowering children, adolescents, and adults through evidence-based therapy.</p>
-            <div className="flex gap-4">
-              <button onClick={openBookingModal} className="bg-teal-600 text-white px-8 py-3 rounded-full font-semibold shadow-lg">Book Appointment</button>
-              <button onClick={() => handleNavClick('services')} className="bg-white border text-slate-700 px-8 py-3 rounded-full font-semibold">View Services</button>
-            </div>
-          </div>
-          <div className="flex-1 relative">
-            <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl rotate-2">
-              <img src={heroContent.image} alt="Wellness" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/40 flex items-end p-8"><p className="text-white text-lg italic">"{heroContent.text}"</p></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Services */}
-      <section id="services" className="py-20 px-6 bg-white">
-        <div className="container mx-auto">
-          <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">My Services</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {services.map((service, idx) => (
-              <div key={idx} className="bg-stone-50 p-6 rounded-2xl shadow-sm hover:shadow-xl transition-shadow duration-300 border border-stone-100 group">
-                <div className="bg-white w-16 h-16 rounded-xl flex items-center justify-center mb-6 group-hover:bg-teal-600 transition-colors duration-300 shadow-sm">
-                  <service.Icon className="w-8 h-8 text-teal-600 group-hover:text-white transition-colors" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-3">{service.title}</h3>
-                <p className="text-slate-600 text-sm leading-relaxed mb-6">{service.description}</p>
-                <div className="flex flex-wrap gap-2">{service.tags.map((tag, tIdx) => (<span key={tIdx} className="text-xs font-medium bg-white border border-stone-200 text-stone-600 px-2 py-1 rounded-md">{tag}</span>))}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section id="testimonials" className="py-20 px-6 bg-teal-900 text-white">
-        <div className="container mx-auto max-w-6xl">
-          <h2 className="text-3xl font-bold text-center mb-12">Stories of Growth</h2>
-          <div className="grid md:grid-cols-2 gap-12">
-            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-              {reviews.map(r => (
-                <div key={r.id} className="bg-white/10 p-6 rounded-xl border border-white/10 relative group">
-                  <div className="flex justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center text-sm font-bold">{r.name ? r.name.charAt(0) : 'A'}</div>
-                      <span className="font-bold">{r.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="flex text-yellow-400">{[...Array(5)].map((_, i) => (<Star key={i} size={14} fill={i < r.rating ? "currentColor" : "none"} className={i < r.rating ? "" : "text-white/20"} />))}</div>
-                        {isAdmin && <button onClick={(e) => initiateDelete(e, r.id)} className="text-red-300 hover:text-red-100 p-1 transition-colors"><Trash2 size={16} /></button>}
-                    </div>
-                  </div>
-                  <p className="text-sm opacity-90">"{r.text}"</p>
-                </div>
-              ))}
-            </div>
-            <div className="bg-white rounded-2xl p-8 text-slate-800">
-              <h3 className="text-xl font-bold mb-6">Share Your Story</h3>
-              
-              {hasBooked ? (
-                <form onSubmit={handlePostReview} className="space-y-4 animate-fade-in">
-                  <textarea className="w-full px-4 py-3 border rounded-lg" rows="4" placeholder="Your experience..." value={newReview.text} onChange={e => setNewReview({...newReview, text: e.target.value})} required></textarea>
-                  <div className="grid grid-cols-2 gap-4">
-                    <input 
-                      className="px-4 py-2 border rounded-lg disabled:bg-gray-100 disabled:text-gray-500" 
-                      placeholder="Name" 
-                      value={newReview.name} 
-                      onChange={e => setNewReview({...newReview, name: e.target.value})} 
-                      disabled={newReview.anonymous}
-                      required={!newReview.anonymous} 
-                    />
-                    <select className="px-4 py-2 border rounded-lg" value={newReview.rating} onChange={e => setNewReview({...newReview, rating: parseInt(e.target.value)})}>
-                      <option value="5">5 Stars</option>
-                      <option value="4">4 Stars</option>
-                      <option value="3">3 Stars</option>
-                      <option value="2">2 Stars</option>
-                      <option value="1">1 Star</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                      <input 
-                          type="checkbox" 
-                          id="anonymous" 
-                          checked={newReview.anonymous} 
-                          onChange={(e) => setNewReview({...newReview, anonymous: e.target.checked, name: e.target.checked ? "" : newReview.name})} 
-                          className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 border-gray-300" 
-                      />
-                      <label htmlFor="anonymous" className="text-sm text-slate-600 select-none cursor-pointer">Post anonymously</label>
-                  </div>
-                  <button type="submit" disabled={reviewStatus === 'submitting'} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold">
-                    {reviewStatus === 'submitting' ? 'Posting...' : 'Post Review'}
-                  </button>
-                  {reviewStatus === 'error' && <p className="text-red-500 text-xs mt-2">Could not post review. Please try again.</p>}
-                </form>
-              ) : (
-                <div className="text-center py-8 bg-stone-50 rounded-xl border border-stone-200">
-                  <div className="inline-flex items-center justify-center w-12 h-12 bg-teal-100 text-teal-600 rounded-full mb-3">
-                    <Lock size={20} />
-                  </div>
-                  <h4 className="font-bold text-slate-700 mb-2">Verified Customers Only</h4>
-                  <p className="text-sm text-slate-500 mb-4 px-6">To maintain authenticity, only clients who have completed a booking can share their experience.</p>
-                  <button onClick={openVerifyModal} className="text-teal-600 font-semibold text-sm hover:underline">Verify your number or book a session</button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-    </section>
-  );
-
-  const ContactPage = () => (
-    <section className="pt-32 pb-20 px-6 bg-slate-900 text-white min-h-screen animate-fade-in">
-        <div className="container mx-auto max-w-5xl">
-          <div className="grid md:grid-cols-2 gap-16">
-            <div className="space-y-8">
-              <div><h2 className="text-3xl md:text-4xl font-bold mb-4">Start Your Journey Today</h2><div className="w-20 h-1.5 bg-teal-500 rounded-full mb-6"></div><p className="text-slate-300 text-lg">Taking the first step towards mental wellness is a sign of strength. Reach out to schedule a consultation or for any inquiries.</p></div>
-              <div className="space-y-6">
-                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Phone className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Call Me</h3><a href="tel:+918000401045" className="text-slate-300 hover:text-white transition-colors">+91-8000401045</a></div></div>
-                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Mail className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Email Me</h3><a href="mailto:nimishakhandelwal995@gmail.com" className="text-slate-300 hover:text-white transition-colors break-all">nimishakhandelwal995@gmail.com</a></div></div>
-                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><MapPin className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Location</h3><p className="text-slate-300">142 Royal Bungalow, Sukhliya<br />Indore, MP 42010</p></div></div>
-              </div>
-            </div>
-            <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-2xl">
-              <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
-              <form className="space-y-4" onSubmit={handleSendMessage}>
-                <div><label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label><input type="text" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="John Doe" required /></div>
-                <div><label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label><input type="tel" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="+91 XXXXX XXXXX" required /></div>
-                <div><label className="block text-sm font-medium text-slate-700 mb-1">Message</label><textarea rows="4" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all resize-none" placeholder="How can I help you?" required></textarea></div>
-                <button type="submit" disabled={formStatus !== 'idle'} className={`w-full font-bold py-3.5 rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${formStatus === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}>
-                  {formStatus === 'idle' && "Send Message"}
-                  {formStatus === 'sending' && <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Sending...</>}
-                  {formStatus === 'success' && <><CheckCircle className="w-5 h-5" />Message Sent!</>}
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </section>
-    </>
-  );
-
-  const AboutPage = () => (
-    <section className="pt-32 pb-20 px-6 bg-white min-h-screen animate-fade-in">
-      <div className="container mx-auto max-w-5xl">
-        <div className="text-center mb-16 space-y-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-800">About Me</h2>
-          <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
-          <p className="text-slate-600 max-w-2xl mx-auto">
-            With a strong academic foundation and hands-on experience in clinical and educational settings, I strive to create safe spaces for growth and healing.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6 text-slate-600 leading-relaxed">
-            <p>
-              Hello, I'm <strong className="text-teal-700">Nimisha Khandelwal</strong>, a Counselling Psychologist based in Indore. 
-              I hold a Gold Medal in M.A. Psychology from Mohanlal Sukhadia University and specialized training in Clinical Psychology.
-            </p>
-            <p>
-              My journey includes significant tenure at <span className="font-semibold text-slate-800">Allen Career Institute, Kota</span>, where I supported students through high-pressure academic environments.
-            </p>
-            
-            <div className="grid grid-cols-2 gap-4 mt-6">
-              <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
-                <h4 className="font-bold text-slate-800 mb-1">Education</h4>
-                <p className="text-sm">M.A. Psychology (Gold Medalist)</p>
-                <p className="text-xs text-slate-500 mt-1">Specialization in Clinical Psychology</p>
-              </div>
-              <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
-                <h4 className="font-bold text-slate-800 mb-1">Key Skills</h4>
-                <p className="text-sm">CBT, Reality Therapy, Crisis Intervention</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-             <div className="bg-teal-600 text-white p-8 rounded-2xl shadow-xl">
-               <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                 <Award className="w-6 h-6" /> Certifications
-               </h3>
-               <ul className="space-y-4 text-teal-50">
-                 <li className="flex items-start gap-3">
-                   <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
-                   <span>QPR Gatekeeper Certification</span>
-                 </li>
-                 <li className="flex items-start gap-3">
-                   <div className="mt-1.5 w-1.5 h-1.5 bg-white rounded-full flex-shrink-0"></div>
-                   <span>Choice Theory & Reality Therapy</span>
-                 </li>
-               </ul>
-             </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-
-  const ExperiencePage = () => (
-    <section className="pt-32 pb-20 px-6 bg-white min-h-screen animate-fade-in">
-      <div className="container mx-auto max-w-4xl">
-        <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">Professional Journey</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
-        <div className="space-y-12 relative before:absolute before:inset-0 before:ml-5 before:w-0.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:bg-stone-200 before:h-full">
-          {experiences.map((exp, idx) => (
-            <div key={idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-teal-500 text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 absolute left-0 md:left-1/2 translate-x-0"><Calendar size={16} /></div>
-              <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-6 rounded-2xl border border-stone-100 shadow-sm hover:shadow-md transition-shadow ml-16 md:ml-0">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2"><h3 className="font-bold text-lg text-slate-800">{exp.role}</h3><span className="text-xs font-semibold bg-teal-50 text-teal-700 px-2 py-1 rounded-full mt-1 sm:mt-0">{exp.period}</span></div>
-                <div className="text-teal-600 font-medium text-sm mb-3 flex items-center gap-1"><MapPin size={14} /> {exp.org}</div>
-                <p className="text-slate-600 text-sm leading-relaxed">{exp.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-
-  const FAQPage = () => (
-    <section className="pt-32 pb-20 px-6 bg-white min-h-screen animate-fade-in">
-        <div className="container mx-auto max-w-3xl">
-            <div className="text-center mb-16 space-y-4">
-                <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Frequently Asked Questions</h2>
-                <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
-            </div>
-            <div className="space-y-6">
-                {faqs.map((faq, i) => (
-                    <div key={i} className="border border-stone-200 rounded-xl p-6 hover:shadow-md transition-shadow">
-                        <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
-                           <HelpCircle className="w-5 h-5 text-teal-600" />
-                           {faq.q}
-                        </h3>
-                        <p className="text-slate-600 leading-relaxed ml-7">{faq.a}</p>
-                    </div>
-                ))}
-            </div>
-        </div>
-    </section>
-  );
 
   return (
     <div className="min-h-screen bg-stone-50 text-slate-800 font-sans selection:bg-teal-100 relative">
@@ -1272,13 +1251,23 @@ const App = () => {
       </nav>
 
       {/* Page Content Rendering */}
-      {activePage === 'home' && <HomePage />}
-      {activePage === 'about' && <AboutPage />}
-      {activePage === 'experience' && <ExperiencePage />}
-      {activePage === 'services' && <ServicesPage />}
-      {activePage === 'testimonials' && <TestimonialsPage />}
-      {activePage === 'faq' && <FAQPage />}
-      {activePage === 'contact' && <ContactPage />}
+      <HomePage openBookingModal={openBookingModal} handleNavClick={handleNavClick} heroContent={heroContent} />
+      <AboutSection />
+      <ExperienceSection />
+      <ServicesSection />
+      <TestimonialsSection 
+          reviews={reviews} 
+          isAdmin={isAdmin} 
+          initiateDelete={initiateDelete} 
+          hasBooked={hasBooked} 
+          handlePostReview={handlePostReview} 
+          newReview={newReview} 
+          setNewReview={setNewReview} 
+          reviewStatus={reviewStatus} 
+          openVerifyModal={openVerifyModal} 
+      />
+      <FAQSection />
+      <ContactSection handleSendMessage={handleSendMessage} formStatus={formStatus} />
 
       {/* Footer */}
       <footer className="bg-slate-950 text-slate-400 py-8 border-t border-slate-900">
