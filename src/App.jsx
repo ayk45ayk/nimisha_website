@@ -200,6 +200,7 @@ const App = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [paymentStatus, setPaymentStatus] = useState('idle');
   const [paymentConfig, setPaymentConfig] = useState(getPaymentConfig()); 
+  const [hasBooked, setHasBooked] = useState(false); // Track if user has completed a booking
   const paypalRef = useRef(null);
 
   const [newReview, setNewReview] = useState({ name: '', text: '', rating: 5, anonymous: false });
@@ -254,42 +255,17 @@ const App = () => {
   // --- Navigation Logic ---
   const handleNavClick = (id) => {
     setIsMenuOpen(false);
-    
-    // Separate pages
-    if (id === 'about' || id === 'experience' || id === 'faq') {
-      setActivePage(id);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    if (activePage !== 'home') {
-      setActivePage('home');
-      setTimeout(() => {
-        const element = document.getElementById(id);
-        if (element) element.scrollIntoView({ behavior: 'smooth' });
-        else window.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 100);
-    } else {
-      const element = document.getElementById(id);
-      if (element) element.scrollIntoView({ behavior: 'smooth' });
-      else window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    setActivePage(id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // --- Automatic Customer Verification Logic ---
-  // Use a debounced effect to verify the phone number automatically
   useEffect(() => {
     const verifyPhone = async () => {
-        // Basic length check for international numbers (min 7 digits)
         if (!bookingDetails.phone || bookingDetails.phone.length < 7) {
-            // Only clear errors if it's empty, don't show error while typing short numbers
-            if (bookingDetails.phone && bookingDetails.phone.length > 0) {
-               // optional: setValidationErrors(prev => ({ ...prev, phone: "Please enter a valid phone number" }));
-            }
             return;
         }
         
-        // Clear previous phone errors
         setValidationErrors(prev => ({ ...prev, phone: null }));
         setCustomerLookupStatus('searching');
 
@@ -314,7 +290,6 @@ const App = () => {
 
             if (!querySnapshot.empty) {
                 const customerData = querySnapshot.docs[0].data();
-                // Store details in state but DON'T display in inputs (isReturningCustomer = true hides fields)
                 setBookingDetails(prev => ({
                     ...prev,
                     name: customerData.name || '',
@@ -323,6 +298,7 @@ const App = () => {
                 }));
                 setCustomerLookupStatus('found');
                 setIsReturningCustomer(true);
+                setHasBooked(true); // Allow returning customers to post testimonials
             } else {
                 setCustomerLookupStatus('not-found');
                 setIsReturningCustomer(false);
@@ -334,19 +310,17 @@ const App = () => {
         }
     };
 
-    // Debounce logic: Wait 1 second after user stops typing
     const timeoutId = setTimeout(() => {
         if (bookingDetails.phone && bookingDetails.phone.length >= 7) {
             verifyPhone();
         } else {
-            // Reset status if phone is cleared or too short
             setCustomerLookupStatus('idle');
             setIsReturningCustomer(false);
         }
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [bookingDetails.phone, db, appId, isDemoMode]); // Dependency array ensures this runs when phone changes
+  }, [bookingDetails.phone, db, appId, isDemoMode]);
 
   const validateInputs = () => {
       const errors = {};
@@ -376,13 +350,11 @@ const App = () => {
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
-            // Update timestamp only
             const docRef = querySnapshot.docs[0].ref;
             await updateDoc(docRef, {
                 lastBooking: serverTimestamp()
             });
         } else {
-            // Create new
             await addDoc(collectionRef, {
                 phone: bookingDetails.phone,
                 name: bookingDetails.name,
@@ -502,6 +474,7 @@ const App = () => {
   const handlePaymentSuccess = async (details) => {
     setPaymentStatus('success');
     setBookingStep(4);
+    setHasBooked(true); // Allow posting testimonials
     
     trackEvent('booking_confirmed', {
         value: paymentConfig.amount,
@@ -722,47 +695,60 @@ const App = () => {
             </div>
             <div className="bg-white rounded-2xl p-8 text-slate-800">
               <h3 className="text-xl font-bold mb-6">Share Your Story</h3>
-              <form onSubmit={handlePostReview} className="space-y-4">
-                <textarea className="w-full px-4 py-3 border rounded-lg" rows="4" placeholder="Your experience..." value={newReview.text} onChange={e => setNewReview({...newReview, text: e.target.value})} required></textarea>
-                <div className="grid grid-cols-2 gap-4">
-                  <input 
-                    className="px-4 py-2 border rounded-lg disabled:bg-gray-100 disabled:text-gray-500" 
-                    placeholder="Name" 
-                    value={newReview.name} 
-                    onChange={e => setNewReview({...newReview, name: e.target.value})} 
-                    disabled={newReview.anonymous}
-                    required={!newReview.anonymous} 
-                  />
-                  <select className="px-4 py-2 border rounded-lg" value={newReview.rating} onChange={e => setNewReview({...newReview, rating: parseInt(e.target.value)})}>
-                    <option value="5">5 Stars</option>
-                    <option value="4">4 Stars</option>
-                    <option value="3">3 Stars</option>
-                    <option value="2">2 Stars</option>
-                    <option value="1">1 Star</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
+              
+              {hasBooked ? (
+                <form onSubmit={handlePostReview} className="space-y-4 animate-fade-in">
+                  <textarea className="w-full px-4 py-3 border rounded-lg" rows="4" placeholder="Your experience..." value={newReview.text} onChange={e => setNewReview({...newReview, text: e.target.value})} required></textarea>
+                  <div className="grid grid-cols-2 gap-4">
                     <input 
-                        type="checkbox" 
-                        id="anonymous" 
-                        checked={newReview.anonymous} 
-                        onChange={(e) => setNewReview({...newReview, anonymous: e.target.checked, name: e.target.checked ? "" : newReview.name})} 
-                        className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 border-gray-300" 
+                      className="px-4 py-2 border rounded-lg disabled:bg-gray-100 disabled:text-gray-500" 
+                      placeholder="Name" 
+                      value={newReview.name} 
+                      onChange={e => setNewReview({...newReview, name: e.target.value})} 
+                      disabled={newReview.anonymous}
+                      required={!newReview.anonymous} 
                     />
-                    <label htmlFor="anonymous" className="text-sm text-slate-600 select-none cursor-pointer">Post anonymously</label>
+                    <select className="px-4 py-2 border rounded-lg" value={newReview.rating} onChange={e => setNewReview({...newReview, rating: parseInt(e.target.value)})}>
+                      <option value="5">5 Stars</option>
+                      <option value="4">4 Stars</option>
+                      <option value="3">3 Stars</option>
+                      <option value="2">2 Stars</option>
+                      <option value="1">1 Star</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <input 
+                          type="checkbox" 
+                          id="anonymous" 
+                          checked={newReview.anonymous} 
+                          onChange={(e) => setNewReview({...newReview, anonymous: e.target.checked, name: e.target.checked ? "" : newReview.name})} 
+                          className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 border-gray-300" 
+                      />
+                      <label htmlFor="anonymous" className="text-sm text-slate-600 select-none cursor-pointer">Post anonymously</label>
+                  </div>
+                  <button type="submit" disabled={reviewStatus === 'submitting'} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold">
+                    {reviewStatus === 'submitting' ? 'Posting...' : 'Post Review'}
+                  </button>
+                  {reviewStatus === 'error' && <p className="text-red-500 text-xs mt-2">Could not post review. Please try again.</p>}
+                </form>
+              ) : (
+                <div className="text-center py-8 bg-stone-50 rounded-xl border border-stone-200">
+                  <div className="inline-flex items-center justify-center w-12 h-12 bg-teal-100 text-teal-600 rounded-full mb-3">
+                    <Lock size={20} />
+                  </div>
+                  <h4 className="font-bold text-slate-700 mb-2">Verified Customers Only</h4>
+                  <p className="text-sm text-slate-500 mb-4 px-6">To maintain authenticity, only clients who have completed a booking can share their experience.</p>
+                  <button onClick={() => setActiveModal('booking')} className="text-teal-600 font-semibold text-sm hover:underline">Verify your number or book a session</button>
                 </div>
-                <button type="submit" disabled={reviewStatus === 'submitting'} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold">
-                  {reviewStatus === 'submitting' ? 'Posting...' : 'Post Review'}
-                </button>
-                {reviewStatus === 'error' && <p className="text-red-500 text-xs mt-2">Could not post review. Please try again.</p>}
-              </form>
+              )}
             </div>
           </div>
         </div>
-      </section>
+    </section>
+  );
 
-      {/* Contact */}
-      <section id="contact" className="py-20 px-6 bg-slate-900 text-white">
+  const ContactPage = () => (
+    <section className="pt-32 pb-20 px-6 bg-slate-900 text-white min-h-screen animate-fade-in">
         <div className="container mx-auto max-w-5xl">
           <div className="grid md:grid-cols-2 gap-16">
             <div className="space-y-8">
@@ -1201,7 +1187,10 @@ const App = () => {
       {activePage === 'home' && <HomePage />}
       {activePage === 'about' && <AboutPage />}
       {activePage === 'experience' && <ExperiencePage />}
+      {activePage === 'services' && <ServicesPage />}
+      {activePage === 'testimonials' && <TestimonialsPage />}
       {activePage === 'faq' && <FAQPage />}
+      {activePage === 'contact' && <ContactPage />}
 
       {/* Footer */}
       <footer className="bg-slate-950 text-slate-400 py-8 border-t border-slate-900">
