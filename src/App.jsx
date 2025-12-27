@@ -62,7 +62,7 @@ const Modal = ({ title, children, icon: Icon, onClose, className = "" }) => (
 
 const App = () => {
   // --- Navigation & Routing State ---
-  const [activePage, setActivePage] = useState('home'); // 'home', 'about', 'experience', 'services', 'testimonials', 'faq', 'contact'
+  const [activePage, setActivePage] = useState('home'); // 'home', 'about', 'experience', 'faq'
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // --- Firebase Setup ---
@@ -194,8 +194,8 @@ const App = () => {
   const [bookingStep, setBookingStep] = useState(1); 
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'in' }); 
-  const [customerLookupStatus, setCustomerLookupStatus] = useState('idle'); 
+  const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'in' }); // Default country India
+  const [customerLookupStatus, setCustomerLookupStatus] = useState('idle'); // 'idle' | 'searching' | 'found' | 'not-found'
   const [isReturningCustomer, setIsReturningCustomer] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [paymentStatus, setPaymentStatus] = useState('idle');
@@ -254,17 +254,42 @@ const App = () => {
   // --- Navigation Logic ---
   const handleNavClick = (id) => {
     setIsMenuOpen(false);
-    setActivePage(id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Separate pages
+    if (id === 'about' || id === 'experience' || id === 'faq') {
+      setActivePage(id);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (activePage !== 'home') {
+      setActivePage('home');
+      setTimeout(() => {
+        const element = document.getElementById(id);
+        if (element) element.scrollIntoView({ behavior: 'smooth' });
+        else window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
+    } else {
+      const element = document.getElementById(id);
+      if (element) element.scrollIntoView({ behavior: 'smooth' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   // --- Automatic Customer Verification Logic ---
+  // Use a debounced effect to verify the phone number automatically
   useEffect(() => {
     const verifyPhone = async () => {
+        // Basic length check for international numbers (min 7 digits)
         if (!bookingDetails.phone || bookingDetails.phone.length < 7) {
+            // Only clear errors if it's empty, don't show error while typing short numbers
+            if (bookingDetails.phone && bookingDetails.phone.length > 0) {
+               // optional: setValidationErrors(prev => ({ ...prev, phone: "Please enter a valid phone number" }));
+            }
             return;
         }
         
+        // Clear previous phone errors
         setValidationErrors(prev => ({ ...prev, phone: null }));
         setCustomerLookupStatus('searching');
 
@@ -289,6 +314,7 @@ const App = () => {
 
             if (!querySnapshot.empty) {
                 const customerData = querySnapshot.docs[0].data();
+                // Store details in state but DON'T display in inputs (isReturningCustomer = true hides fields)
                 setBookingDetails(prev => ({
                     ...prev,
                     name: customerData.name || '',
@@ -308,17 +334,19 @@ const App = () => {
         }
     };
 
+    // Debounce logic: Wait 1 second after user stops typing
     const timeoutId = setTimeout(() => {
         if (bookingDetails.phone && bookingDetails.phone.length >= 7) {
             verifyPhone();
         } else {
+            // Reset status if phone is cleared or too short
             setCustomerLookupStatus('idle');
             setIsReturningCustomer(false);
         }
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [bookingDetails.phone, db, appId, isDemoMode]);
+  }, [bookingDetails.phone, db, appId, isDemoMode]); // Dependency array ensures this runs when phone changes
 
   const validateInputs = () => {
       const errors = {};
@@ -348,11 +376,13 @@ const App = () => {
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
+            // Update timestamp only
             const docRef = querySnapshot.docs[0].ref;
             await updateDoc(docRef, {
                 lastBooking: serverTimestamp()
             });
         } else {
+            // Create new
             await addDoc(collectionRef, {
                 phone: bookingDetails.phone,
                 name: bookingDetails.name,
@@ -628,7 +658,9 @@ const App = () => {
   // --- Sub-Components (Pages) ---
   
   const HomePage = () => (
-    <section className="pt-32 pb-20 px-6 bg-stone-50 animate-fade-in min-h-screen flex flex-col justify-center">
+    <>
+      {/* Hero */}
+      <section id="home" className="pt-32 pb-20 px-6 bg-stone-50 animate-fade-in">
         <div className="container mx-auto flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 space-y-6">
             <h1 className="text-5xl font-bold text-slate-900">Compassionate Care for <span className="text-teal-600">Mental Wellness</span></h1>
@@ -645,11 +677,10 @@ const App = () => {
             </div>
           </div>
         </div>
-    </section>
-  );
+      </section>
 
-  const ServicesPage = () => (
-    <section className="pt-32 pb-20 px-6 bg-white min-h-screen animate-fade-in">
+      {/* Services */}
+      <section id="services" className="py-20 px-6 bg-white">
         <div className="container mx-auto">
           <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-bold text-slate-800">My Services</h2><div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full mt-4"></div></div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -665,11 +696,10 @@ const App = () => {
             ))}
           </div>
         </div>
-    </section>
-  );
+      </section>
 
-  const TestimonialsPage = () => (
-    <section className="pt-32 pb-20 px-6 bg-teal-900 text-white min-h-screen animate-fade-in">
+      {/* Testimonials */}
+      <section id="testimonials" className="py-20 px-6 bg-teal-900 text-white">
         <div className="container mx-auto max-w-6xl">
           <h2 className="text-3xl font-bold text-center mb-12">Stories of Growth</h2>
           <div className="grid md:grid-cols-2 gap-12">
@@ -729,11 +759,10 @@ const App = () => {
             </div>
           </div>
         </div>
-    </section>
-  );
+      </section>
 
-  const ContactPage = () => (
-    <section className="pt-32 pb-20 px-6 bg-slate-900 text-white min-h-screen animate-fade-in">
+      {/* Contact */}
+      <section id="contact" className="py-20 px-6 bg-slate-900 text-white">
         <div className="container mx-auto max-w-5xl">
           <div className="grid md:grid-cols-2 gap-16">
             <div className="space-y-8">
@@ -759,7 +788,8 @@ const App = () => {
             </div>
           </div>
         </div>
-    </section>
+      </section>
+    </>
   );
 
   const AboutPage = () => (
@@ -1171,10 +1201,7 @@ const App = () => {
       {activePage === 'home' && <HomePage />}
       {activePage === 'about' && <AboutPage />}
       {activePage === 'experience' && <ExperiencePage />}
-      {activePage === 'services' && <ServicesPage />}
-      {activePage === 'testimonials' && <TestimonialsPage />}
       {activePage === 'faq' && <FAQPage />}
-      {activePage === 'contact' && <ContactPage />}
 
       {/* Footer */}
       <footer className="bg-slate-950 text-slate-400 py-8 border-t border-slate-900">
