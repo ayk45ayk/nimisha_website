@@ -513,6 +513,38 @@ const App = () => {
         </div>
       )}
 
+      {/* Privacy Policy Modal */}
+      {activeModal === 'privacy' && (
+        <Modal title="Privacy Policy" icon={Shield} onClose={() => setActiveModal(null)}>
+          <div className="space-y-4 text-sm text-slate-600">
+            <h4 className="font-bold text-slate-800">1. Information Collection</h4>
+            <p>We collect personal information such as your name, email address, and phone number when you book an appointment or contact us. This information is used solely for the purpose of providing counseling services.</p>
+            
+            <h4 className="font-bold text-slate-800">2. Data Usage</h4>
+            <p>Your data is used to schedule appointments, send confirmations, and communicate regarding your sessions. We do not sell or share your personal data with third parties.</p>
+
+            <h4 className="font-bold text-slate-800">3. Confidentiality</h4>
+            <p>All counseling sessions are strictly confidential. Information shared during sessions will not be disclosed without your consent, except where required by law or if there is a risk of harm to yourself or others.</p>
+          </div>
+        </Modal>
+      )}
+
+      {/* Terms of Service Modal */}
+      {activeModal === 'terms' && (
+        <Modal title="Terms of Service" icon={FileText} onClose={() => setActiveModal(null)}>
+           <div className="space-y-4 text-sm text-slate-600">
+            <h4 className="font-bold text-slate-800">1. Services</h4>
+            <p>Nimisha Khandelwal provides psychological counseling and therapy services. These services are not a substitute for medical advice or emergency psychiatric intervention.</p>
+            
+            <h4 className="font-bold text-slate-800">2. Emergency Disclaimer</h4>
+            <p className="bg-red-50 text-red-700 p-3 rounded-lg border border-red-100">If you are in a crisis or suicidal, please contact your local emergency services immediately. This website and its services are not designed for emergency crisis management.</p>
+
+            <h4 className="font-bold text-slate-800">3. Cancellations</h4>
+            <p>Please provide at least 24 hours notice for cancellations. Missed appointments without notice may be subject to a fee.</p>
+          </div>
+        </Modal>
+      )}
+
       {/* Delete Confirmation Modal */}
       {activeModal === 'deleteConfirm' && (
         <Modal title="Delete Testimonial" icon={AlertTriangle} onClose={() => setActiveModal(null)} className="max-w-md">
