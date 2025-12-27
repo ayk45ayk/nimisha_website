@@ -11,6 +11,8 @@ import {
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getPaymentConfig, getPaymentConfigAsync, loadScript, processPayment as processDemoPayment } from './utils/payment.js';
+import TrackingManager from './components/TrackingManager.jsx';
+import { trackEvent, logError } from './lib/tracking.js';
 
 // --- Error Boundary ---
 class ErrorBoundary extends React.Component {
@@ -19,7 +21,10 @@ class ErrorBoundary extends React.Component {
     this.state = { hasError: false, error: null };
   }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
-  componentDidCatch(error, errorInfo) { console.error("Uncaught error:", error, errorInfo); }
+  componentDidCatch(error, errorInfo) { 
+    console.error("Uncaught error:", error, errorInfo);
+    logError(error, { component: 'ErrorBoundary', info: errorInfo });
+  }
   render() {
     if (this.state.hasError) {
       return (
@@ -67,7 +72,7 @@ const App = () => {
     if (typeof __firebase_config !== 'undefined') {
       try {
         firebaseConfig = JSON.parse(__firebase_config);
-      } catch (e) { console.warn("Failed to parse global firebase config"); }
+      } catch (e) { logError(e, { context: 'JSON Parse Global Config' }); }
     }
     
     // 2. Try Standard Vite Environment Variables (Vercel)
@@ -107,7 +112,7 @@ const App = () => {
             await signInAnonymously(auth);
           }
         } catch (e) {
-          console.error("Auth failed:", e);
+          logError(e, { context: 'Auth Init' });
           setIsDemoMode(true);
         }
       };
@@ -118,7 +123,7 @@ const App = () => {
       });
       return () => unsubscribeAuth();
     } catch (err) {
-      console.error("Firebase Init Error:", err);
+      logError(err, { context: 'Firebase Init' });
       setIsDemoMode(true);
     }
   }, []);
@@ -159,12 +164,12 @@ const App = () => {
 
         setReviews(fetchedReviews);
       }, (error) => {
-        console.error("Error fetching reviews:", error);
+        logError(error, { context: 'Fetch Reviews' });
         if (reviews.length === 0) setIsDemoMode(true);
       });
       return () => unsubscribe();
     } catch (e) {
-      console.error("Query failed:", e);
+      logError(e, { context: 'Review Query' });
       setIsDemoMode(true);
     }
   }, [user, db, appId, isDemoMode]);
@@ -284,7 +289,7 @@ const App = () => {
       await deleteDoc(docRef);
       setActiveModal(null); setReviewToDelete(null); setDeleteStatus('idle');
     } catch (error) {
-      console.error("Delete failed", error);
+      logError(error, { context: 'Delete Review' });
       setDeleteStatus('error');
     }
   };
@@ -330,7 +335,7 @@ const App = () => {
       setReviewStatus('success');
       setTimeout(() => setReviewStatus('idle'), 2000);
     } catch (error) {
-      console.error("Review failed", error);
+      logError(error, { context: 'Post Review' });
       // Fallback: If DB fails or times out, optimistically add to UI for this session
       const mockReview = { 
          name: newReview.anonymous ? "Anonymous" : newReview.name,
@@ -350,6 +355,13 @@ const App = () => {
     setPaymentStatus('success');
     setBookingStep(4);
     
+    // TRACK CONVERSION EVENT
+    trackEvent('booking_confirmed', {
+        value: paymentConfig.amount,
+        currency: paymentConfig.currency,
+        provider: paymentConfig.provider
+    });
+    
     // Call backend to send email
     if (import.meta.env.PROD) {
       try {
@@ -364,7 +376,7 @@ const App = () => {
                 transactionId: details?.id || details?.razorpay_payment_id
             })
         });
-      } catch(e) { console.warn("Email API failed", e); }
+      } catch(e) { logError(e, { context: 'Booking API' }); }
     }
   };
 
@@ -416,7 +428,7 @@ const App = () => {
         rzp1.open();
         setPaymentStatus('idle'); // Modal opened, status resets to allow retry/cancellation
     } catch (error) {
-        console.error("Payment Error", error);
+        logError(error, { context: 'Razorpay Init' });
         setPaymentStatus('error');
     }
   };
@@ -424,7 +436,12 @@ const App = () => {
   const handleSendMessage = (e) => {
     e.preventDefault();
     setFormStatus('sending');
-    setTimeout(() => { setFormStatus('success'); setTimeout(() => setFormStatus('idle'), 3000); }, 1500);
+    // Track form submission attempt
+    trackEvent('contact_form_submit');
+    setTimeout(() => { 
+        setFormStatus('success'); 
+        setTimeout(() => setFormStatus('idle'), 3000); 
+    }, 1500);
   };
 
   const resetBooking = () => {
@@ -485,6 +502,9 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-stone-50 text-slate-800 font-sans selection:bg-teal-100 relative">
+      {/* Tracking Manager - Handles Consent & Init */}
+      <TrackingManager />
+
       {/* Demo Mode Banner */}
       {isDemoMode && (
         <div className="bg-amber-100 border-b border-amber-200 text-amber-900 px-4 py-2 text-sm text-center flex items-center justify-center gap-2 animate-fade-in">
