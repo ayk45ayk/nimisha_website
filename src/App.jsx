@@ -188,35 +188,81 @@ const TestimonialsSection = ({ reviews, isAdmin, initiateDelete, hasBooked, hand
   </section>
 );
 
-const ContactSection = ({ handleSendMessage, formStatus }) => (
-  <section id="contact" className="py-20 px-6 bg-slate-900 text-white">
-      <div className="container mx-auto max-w-5xl">
-        <div className="grid md:grid-cols-2 gap-16">
-          <div className="space-y-8">
-            <div><h2 className="text-3xl md:text-4xl font-bold mb-4">Start Your Journey Today</h2><div className="w-20 h-1.5 bg-teal-500 rounded-full mb-6"></div><p className="text-slate-300 text-lg">Taking the first step towards mental wellness is a sign of strength. Reach out to schedule a consultation or for any inquiries.</p></div>
-            <div className="space-y-6">
-              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Phone className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Call Me</h3><a href="tel:+918000401045" className="text-slate-300 hover:text-white transition-colors">+91-8000401045</a></div></div>
-              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Mail className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Email Me</h3><a href="mailto:nimishakhandelwal995@gmail.com" className="text-slate-300 hover:text-white transition-colors break-all">nimishakhandelwal995@gmail.com</a></div></div>
-              <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><MapPin className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Location</h3><p className="text-slate-300">142 Royal Bungalow, Sukhliya<br />Indore, MP 42010</p></div></div>
+const ContactSection = ({ handleSendMessage, formStatus }) => {
+  // Use state to manage form fields
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    message: ''
+  });
+
+  const onSubmit = (e) => {
+    e.preventDefault();
+    handleSendMessage(formData);
+    // Optionally clear form here or in handleSendMessage
+    setFormData({ name: '', phone: '', message: '' });
+  };
+
+  return (
+    <section id="contact" className="py-20 px-6 bg-slate-900 text-white">
+        <div className="container mx-auto max-w-5xl">
+          <div className="grid md:grid-cols-2 gap-16">
+            <div className="space-y-8">
+              <div><h2 className="text-3xl md:text-4xl font-bold mb-4">Start Your Journey Today</h2><div className="w-20 h-1.5 bg-teal-500 rounded-full mb-6"></div><p className="text-slate-300 text-lg">Taking the first step towards mental wellness is a sign of strength. Reach out to schedule a consultation or for any inquiries.</p></div>
+              <div className="space-y-6">
+                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Phone className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Call Me</h3><a href="tel:+918000401045" className="text-slate-300 hover:text-white transition-colors">+91-8000401045</a></div></div>
+                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Mail className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Email Me</h3><a href="mailto:nimishakhandelwal995@gmail.com" className="text-slate-300 hover:text-white transition-colors break-all">nimishakhandelwal995@gmail.com</a></div></div>
+                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><MapPin className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Location</h3><p className="text-slate-300">142 Royal Bungalow, Sukhliya<br />Indore, MP 42010</p></div></div>
+              </div>
+            </div>
+            <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-2xl">
+              <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
+              <form className="space-y-4" onSubmit={onSubmit}>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" 
+                    placeholder="John Doe" 
+                    required 
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+                  <input 
+                    type="tel" 
+                    className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" 
+                    placeholder="+91 XXXXX XXXXX" 
+                    required 
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
+                  <textarea 
+                    rows="4" 
+                    className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all resize-none" 
+                    placeholder="How can I help you?" 
+                    required
+                    value={formData.message}
+                    onChange={(e) => setFormData({...formData, message: e.target.value})}
+                  ></textarea>
+                </div>
+                <button type="submit" disabled={formStatus !== 'idle'} className={`w-full font-bold py-3.5 rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${formStatus === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}>
+                  {formStatus === 'idle' && "Send Message"}
+                  {formStatus === 'sending' && <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Sending...</>}
+                  {formStatus === 'success' && <><CheckCircle className="w-5 h-5" />Message Sent!</>}
+                </button>
+              </form>
             </div>
           </div>
-          <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-2xl">
-            <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
-            <form className="space-y-4" onSubmit={handleSendMessage}>
-              <div><label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label><input type="text" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="John Doe" required /></div>
-              <div><label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label><input type="tel" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" placeholder="+91 XXXXX XXXXX" required /></div>
-              <div><label className="block text-sm font-medium text-slate-700 mb-1">Message</label><textarea rows="4" className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all resize-none" placeholder="How can I help you?" required></textarea></div>
-              <button type="submit" disabled={formStatus !== 'idle'} className={`w-full font-bold py-3.5 rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${formStatus === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}>
-                {formStatus === 'idle' && "Send Message"}
-                {formStatus === 'sending' && <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Sending...</>}
-                {formStatus === 'success' && <><CheckCircle className="w-5 h-5" />Message Sent!</>}
-              </button>
-            </form>
-          </div>
         </div>
-      </div>
-  </section>
-);
+    </section>
+  );
+};
 
 const AboutSection = () => (
   <section id="about" className="py-20 px-6 bg-white">
@@ -878,14 +924,39 @@ const App = () => {
     }
   };
 
-  const handleSendMessage = (e) => {
-    e.preventDefault();
+  const handleSendMessage = async (formData) => {
     setFormStatus('sending');
-    trackEvent('contact_form_submit');
+    
+    // 1. WhatsApp Message
+    const text = `Hello Nimisha, I have a query.%0A%0A*Name:* ${formData.name}%0A*Phone:* ${formData.phone}%0A*Message:* ${formData.message}`;
+    const whatsappUrl = `https://wa.me/918000401045?text=${text}`;
+    window.open(whatsappUrl, '_blank');
+
+    // 2. Email Notification (via Serverless Function)
+    if (import.meta.env.PROD) {
+      try {
+        const response = await fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+        
+        if (!response.ok) throw new Error('Email sending failed');
+        
+        trackEvent('contact_form_submit');
+      } catch (error) {
+        console.warn("Contact API error:", error);
+        // Continue to show success since WhatsApp likely worked
+      }
+    } else {
+      // Demo mode success simulation
+      console.log("Demo Mode: Email would be sent here", formData);
+    }
+
+    setFormStatus('success');
     setTimeout(() => { 
-        setFormStatus('success'); 
-        setTimeout(() => setFormStatus('idle'), 3000); 
-    }, 1500);
+        setFormStatus('idle'); 
+    }, 3000);
   };
 
   const resetBooking = () => {
