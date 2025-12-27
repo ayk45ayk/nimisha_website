@@ -302,7 +302,7 @@ const ExperienceSection = () => {
   );
 };
 
-const FAQSection = () => {
+const FAQPage = () => {
   const faqs = [
     { q: "Why do I need counseling?", a: "Counseling provides a supportive environment to explore personal challenges, improve mental well-being, and develop coping strategies for various life stressors." },
     { q: "Who can take an appointment?", a: "Anyone seeking support for mental health, emotional difficulties, or personal growth can book an appointment. This includes children, adolescents, and adults." },
@@ -346,7 +346,7 @@ const FAQSection = () => {
   };
 
   return (
-    <section id="faq" className="py-20 px-6 bg-white">
+    <section id="faq" className="pt-32 pb-20 px-6 bg-white min-h-screen animate-fade-in">
         <div className="container mx-auto max-w-3xl">
             <div className="text-center mb-16 space-y-4">
                 <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Frequently Asked Questions</h2>
@@ -534,11 +534,26 @@ const App = () => {
   // --- Navigation Logic ---
   const handleNavClick = (id) => {
     setIsMenuOpen(false);
-    const element = document.getElementById(id);
-    if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
+    
+    // Separate FAQ page logic
+    if (id === 'faq') {
+      setActivePage('faq');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (activePage !== 'home') {
+      setActivePage('home');
+      // Wait for re-render if switching from FAQ page back to home components
+      setTimeout(() => {
+        const element = document.getElementById(id);
+        if (element) element.scrollIntoView({ behavior: 'smooth' });
+        else window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
     } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+      const element = document.getElementById(id);
+      if (element) element.scrollIntoView({ behavior: 'smooth' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -1271,23 +1286,28 @@ const App = () => {
       </nav>
 
       {/* Page Content Rendering */}
-      <HeroSection openBookingModal={openBookingModal} handleNavClick={handleNavClick} heroContent={heroContent} />
-      <AboutSection />
-      <ExperienceSection />
-      <ServicesSection />
-      <TestimonialsSection 
-          reviews={reviews} 
-          isAdmin={isAdmin} 
-          initiateDelete={initiateDelete} 
-          hasBooked={hasBooked} 
-          handlePostReview={handlePostReview} 
-          newReview={newReview} 
-          setNewReview={setNewReview} 
-          reviewStatus={reviewStatus} 
-          openVerifyModal={openVerifyModal} 
-      />
-      <FAQSection />
-      <ContactSection handleSendMessage={handleSendMessage} formStatus={formStatus} />
+      {activePage === 'faq' ? (
+        <FAQPage />
+      ) : (
+        <>
+          <HeroSection openBookingModal={openBookingModal} handleNavClick={handleNavClick} heroContent={heroContent} />
+          <AboutSection />
+          <ExperienceSection />
+          <ServicesSection />
+          <TestimonialsSection 
+              reviews={reviews} 
+              isAdmin={isAdmin} 
+              initiateDelete={initiateDelete} 
+              hasBooked={hasBooked} 
+              handlePostReview={handlePostReview} 
+              newReview={newReview} 
+              setNewReview={setNewReview} 
+              reviewStatus={reviewStatus} 
+              openVerifyModal={openVerifyModal} 
+          />
+          <ContactSection handleSendMessage={handleSendMessage} formStatus={formStatus} />
+        </>
+      )}
 
       {/* Footer */}
       <footer className="bg-slate-950 text-slate-400 py-8 border-t border-slate-900">
