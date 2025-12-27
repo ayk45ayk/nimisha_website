@@ -310,17 +310,21 @@ const App = () => {
         }
     };
 
+    // Only run verify logic if modal is open and on appropriate step
+    // Using a ref to prevent loops if needed, but dependency array should suffice
     const timeoutId = setTimeout(() => {
-        if (bookingDetails.phone && bookingDetails.phone.length >= 7) {
+        // Run verify if phone is valid length AND (we are in booking mode OR verification mode)
+        if (bookingDetails.phone && bookingDetails.phone.length >= 7 && (bookingStep === 2 || bookingStep === 0)) {
             verifyPhone();
         } else {
+            if (bookingStep !== 0 && bookingStep !== 2) return; // Don't reset if on other steps
             setCustomerLookupStatus('idle');
             setIsReturningCustomer(false);
         }
     }, 1000);
 
     return () => clearTimeout(timeoutId);
-  }, [bookingDetails.phone, db, appId, isDemoMode]);
+  }, [bookingDetails.phone, db, appId, isDemoMode, bookingStep]);
 
   const validateInputs = () => {
       const errors = {};
@@ -373,6 +377,32 @@ const App = () => {
       if (!validateInputs()) return;
       await saveCustomer();
       setBookingStep(3);
+  };
+
+  const handleVerifyOnly = () => {
+      if (customerLookupStatus === 'found') {
+          // User verified, they can now post testimonials
+          setActiveModal(null); // Close modal
+          // Optionally show a toast "Verified successfully!"
+      } else if (customerLookupStatus === 'not-found') {
+          // User not found, prompt to book
+          // Move to booking step 1
+          setBookingStep(1);
+      }
+  };
+
+  const openVerifyModal = () => {
+      setBookingStep(0); // 0 = Verify Only Mode
+      setBookingDetails({ name: '', email: '', phone: '', country: 'in' });
+      setCustomerLookupStatus('idle');
+      setActiveModal('booking');
+  };
+
+  const openBookingModal = () => {
+      setBookingStep(1); // 1 = Date Selection (Normal Booking Flow)
+      setBookingDetails({ name: '', email: '', phone: '', country: 'in' });
+      setCustomerLookupStatus('idle');
+      setActiveModal('booking');
   };
 
   const handleAdminLogin = (e) => {
@@ -639,7 +669,7 @@ const App = () => {
             <h1 className="text-5xl font-bold text-slate-900">Compassionate Care for <span className="text-teal-600">Mental Wellness</span></h1>
             <p className="text-lg text-slate-600">Dedicated to empowering children, adolescents, and adults through evidence-based therapy.</p>
             <div className="flex gap-4">
-              <button onClick={() => setActiveModal('booking')} className="bg-teal-600 text-white px-8 py-3 rounded-full font-semibold shadow-lg">Book Appointment</button>
+              <button onClick={openBookingModal} className="bg-teal-600 text-white px-8 py-3 rounded-full font-semibold shadow-lg">Book Appointment</button>
               <button onClick={() => handleNavClick('services')} className="bg-white border text-slate-700 px-8 py-3 rounded-full font-semibold">View Services</button>
             </div>
           </div>
@@ -738,7 +768,7 @@ const App = () => {
                   </div>
                   <h4 className="font-bold text-slate-700 mb-2">Verified Customers Only</h4>
                   <p className="text-sm text-slate-500 mb-4 px-6">To maintain authenticity, only clients who have completed a booking can share their experience.</p>
-                  <button onClick={() => setActiveModal('booking')} className="text-teal-600 font-semibold text-sm hover:underline">Verify your number or book a session</button>
+                  <button onClick={openVerifyModal} className="text-teal-600 font-semibold text-sm hover:underline">Verify your number or book a session</button>
                 </div>
               )}
             </div>
@@ -985,7 +1015,57 @@ const App = () => {
 
       {/* Booking Modal */}
       {activeModal === 'booking' && (
-        <Modal title="Book Appointment" icon={Calendar} onClose={resetBooking}>
+        <Modal title={bookingStep === 0 ? "Verify Phone Number" : "Book Appointment"} icon={bookingStep === 0 ? Phone : Calendar} onClose={resetBooking}>
+          
+          {/* STEP 0: VERIFY ONLY (FROM TESTIMONIALS) */}
+          {bookingStep === 0 && (
+            <div className="space-y-6">
+              <p className="text-slate-600 text-sm">Please verify your phone number to check if you are eligible to post a testimonial.</p>
+              
+              <div className="space-y-1">
+                 <label className="text-sm font-medium text-slate-700">Mobile Number *</label>
+                 <div className="flex gap-2">
+                   <div className="flex-1">
+                     <PhoneInput
+                       country={'in'}
+                       value={bookingDetails.phone}
+                       onChange={(phone, country) => setBookingDetails({...bookingDetails, phone, country: country.name})}
+                       inputClass="!w-full !py-2.5 !h-11 !text-base !rounded-lg !border-stone-200 !font-sans"
+                       buttonClass="!bg-white !border-stone-200 !rounded-l-lg"
+                       dropdownClass="!shadow-xl !rounded-lg"
+                       disabled={customerLookupStatus === 'found'}
+                     />
+                   </div>
+                   <button className="hidden"></button>
+                 </div>
+                 {customerLookupStatus === 'searching' && <p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><Loader className="animate-spin w-3 h-3"/> Verifying...</p>}
+              </div>
+
+              {/* Status Messages for Verify Mode */}
+              {customerLookupStatus === 'found' && (
+                  <div className="bg-green-50 border border-green-100 p-4 rounded-lg flex flex-col gap-2 animate-fade-in">
+                      <div className="flex items-center gap-2 text-green-700 font-medium">
+                        <CheckCircle className="w-5 h-5"/> 
+                        <span>Verified!</span>
+                      </div>
+                      <p className="text-sm text-green-600">You can now post your testimonial.</p>
+                      <button onClick={handleVerifyOnly} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm mt-2 hover:bg-green-700 transition-colors">Continue to Testimonials</button>
+                  </div>
+              )}
+
+              {customerLookupStatus === 'not-found' && (
+                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex flex-col gap-2 animate-fade-in">
+                      <div className="flex items-center gap-2 text-blue-700 font-medium">
+                        <Info className="w-5 h-5"/> 
+                        <span>Number not found</span>
+                      </div>
+                      <p className="text-sm text-blue-600">We couldn't find a booking associated with this number. Would you like to book a session?</p>
+                      <button onClick={handleVerifyOnly} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm mt-2 hover:bg-blue-700 transition-colors">Book a Session</button>
+                  </div>
+              )}
+            </div>
+          )}
+
           {bookingStep === 1 && (
             <div className="space-y-6">
               <h4 className="font-semibold text-slate-800 mb-4">Select Date</h4>
@@ -1167,7 +1247,7 @@ const App = () => {
                 {l.name}
               </button>
             ))}
-            <button onClick={() => setActiveModal('booking')} className="bg-teal-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:shadow-lg">Book Appointment</button>
+            <button onClick={openBookingModal} className="bg-teal-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:shadow-lg">Book Appointment</button>
           </div>
           <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}><Menu /></button>
         </div>
@@ -1178,7 +1258,7 @@ const App = () => {
                 {l.name}
               </button>
             ))}
-            <button onClick={() => setActiveModal('booking')} className="bg-teal-600 text-white py-3 rounded-lg font-bold">Book Appointment</button>
+            <button onClick={openBookingModal} className="bg-teal-600 text-white py-3 rounded-lg font-bold">Book Appointment</button>
           </div>
         )}
       </nav>
