@@ -193,6 +193,7 @@ const ContactSection = ({ handleSendMessage, formStatus }) => {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
+    country: 'in',
     message: ''
   });
 
@@ -231,13 +232,14 @@ const ContactSection = ({ handleSendMessage, formStatus }) => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
-                  <input 
-                    type="tel" 
-                    className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" 
-                    placeholder="+91 XXXXX XXXXX" 
-                    required 
+                  <PhoneInput
+                    country={'in'}
                     value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    onChange={(phone, country) => setFormData({...formData, phone, country: country.name})}
+                    inputClass="!w-full !py-3 !h-12 !text-base !rounded-lg !border-stone-200 !bg-stone-50 !font-sans focus:!border-teal-500 focus:!ring-2 focus:!ring-teal-200"
+                    buttonClass="!bg-stone-50 !border-stone-200 !rounded-l-lg !h-12"
+                    dropdownClass="!shadow-xl !rounded-lg"
+                    containerClass="!w-full"
                   />
                 </div>
                 <div>
