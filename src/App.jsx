@@ -1243,7 +1243,7 @@ const App = () => {
       </nav>
 
       {/* Page Content Rendering */}
-      <HomePage openBookingModal={openBookingModal} handleNavClick={handleNavClick} heroContent={heroContent} />
+      <HeroSection openBookingModal={openBookingModal} handleNavClick={handleNavClick} heroContent={heroContent} />
       <AboutSection />
       <ExperienceSection />
       <ServicesSection />
