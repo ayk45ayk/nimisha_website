@@ -304,12 +304,46 @@ const ExperienceSection = () => {
 
 const FAQSection = () => {
   const faqs = [
-    { q: "How long is each counselling session?", a: "Standard individual sessions typically last for 50-60 minutes. Initial consultations may be slightly longer to gather comprehensive history." },
-    { q: "Is my information kept confidential?", a: "Absolutely. Confidentiality is a cornerstone of therapy. Your information is never shared without your consent, except in rare legal circumstances or if there is an immediate risk of harm." },
-    { q: "Do you offer online sessions?", a: "Yes, I offer secure online video consultations for clients who prefer to meet remotely or are located outside of Indore." },
-    { q: "What is your cancellation policy?", a: "I request at least 24 hours' notice for cancellations. Missed appointments without prior notice may be subject to a cancellation fee." },
-    { q: "How do I know if therapy is right for me?", a: "Therapy provides a safe space to explore feelings and develop coping strategies. If you're feeling overwhelmed, stuck, or just want to understand yourself better, therapy can be very beneficial." }
+    { q: "Why do I need counseling?", a: "Counseling provides a supportive environment to explore personal challenges, improve mental well-being, and develop coping strategies for various life stressors." },
+    { q: "Who can take an appointment?", a: "Anyone seeking support for mental health, emotional difficulties, or personal growth can book an appointment. This includes children, adolescents, and adults." },
+    { q: "What are the benefits of counseling?", a: "Counseling can lead to better self-understanding, improved relationships, reduced stress, enhanced problem-solving skills, and greater emotional resilience." },
+    { q: "What is the online procedure?", a: "Online sessions are conducted via secure video conferencing platforms. After booking, you will receive a link to join the session at the scheduled time." },
+    { q: "What is the offline procedure?", a: "For offline sessions, you will visit the clinic at the scheduled time. Strict hygiene and safety protocols are followed for in-person consultations." },
+    { q: "Will my information be kept confidential?", a: "Yes, confidentiality is paramount. Your information is kept private and is only shared in exceptional circumstances where there is a risk of harm to yourself or others, or as required by law." },
+    { q: "Does counseling really help to deal with problems?", a: "Yes, evidence-based therapies like CBT and others used in counseling are effective in helping individuals manage and overcome various mental health challenges." },
+    { q: "What is Psychotherapy?", a: "Psychotherapy, or talk therapy, involves discussing your thoughts and feelings with a trained professional to understand and resolve psychological problems." },
+    { q: "Does seeking counseling mean I’m not normal?", a: "Not at all. Seeking counseling is a sign of strength and a proactive step towards mental wellness. It is normal to need support at times." },
+    { q: "When does a child or individual need an assessment?", a: "An assessment may be needed if there are persistent behavioral changes, learning difficulties, emotional distress, or developmental concerns." },
+    { q: "What about vacations and canceled sessions?", a: "Advance notice is required for cancellations or rescheduling. Specific policies regarding vacations and missed sessions will be discussed during the initial consultation." },
+    { q: "What happens in the first session?", a: "The first session is typically an intake assessment where we discuss your background, current concerns, and goals for therapy to create a tailored treatment plan." }
   ];
+
+  // Helper component for individual FAQ item
+  const FAQItem = ({ faq }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+      <div className="border border-stone-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow bg-white">
+        <button 
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full flex items-center justify-between p-4 text-left focus:outline-none"
+        >
+          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-3">
+             <HelpCircle className="w-5 h-5 text-teal-600 flex-shrink-0" />
+             {faq.q}
+          </h3>
+          <ChevronLeft className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${isOpen ? '-rotate-90' : ''}`} />
+        </button>
+        <div 
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}
+        >
+          <p className="text-slate-600 leading-relaxed p-4 pt-0 ml-12 border-t-0 border-stone-100">
+            {faq.a}
+          </p>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <section id="faq" className="py-20 px-6 bg-white">
@@ -318,15 +352,9 @@ const FAQSection = () => {
                 <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Frequently Asked Questions</h2>
                 <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
             </div>
-            <div className="space-y-6">
+            <div className="space-y-3">
                 {faqs.map((faq, i) => (
-                    <div key={i} className="border border-stone-200 rounded-xl p-6 hover:shadow-md transition-shadow">
-                        <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
-                           <HelpCircle className="w-5 h-5 text-teal-600" />
-                           {faq.q}
-                        </h3>
-                        <p className="text-slate-600 leading-relaxed ml-7">{faq.a}</p>
-                    </div>
+                    <FAQItem key={i} faq={faq} />
                 ))}
             </div>
         </div>
