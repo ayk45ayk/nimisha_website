@@ -3,13 +3,16 @@ import {
   Heart, Brain, BookOpen, Mail, Phone, MapPin, Menu, X, Award, Calendar, 
   User, Users, Smile, ArrowRight, ExternalLink, CheckCircle, Shield, FileText, 
   Clock, CreditCard, Star, MessageSquare, ChevronLeft, ChevronRight, Send, 
-  Trash2, Lock, AlertTriangle, Loader, Info, Globe, Cookie
+  Trash2, Lock, AlertTriangle, Loader, Info, Globe, Cookie, HelpCircle, Search
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
-  getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp 
+  getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, where, getDocs, setDoc, updateDoc 
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/style.css';
+import isEmail from 'validator/lib/isEmail';
 import { getPaymentConfig, getPaymentConfigAsync, loadScript, processPayment as processDemoPayment } from './utils/payment.js';
 import TrackingManager from './components/TrackingManager.jsx';
 import { trackEvent, logError } from './lib/tracking.js';
@@ -59,7 +62,7 @@ const Modal = ({ title, children, icon: Icon, onClose, className = "" }) => (
 
 const App = () => {
   // --- Navigation & Routing State ---
-  const [activePage, setActivePage] = useState('home'); // 'home', 'about', 'experience'
+  const [activePage, setActivePage] = useState('home'); // 'home', 'about', 'experience', 'faq'
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // --- Firebase Setup ---
@@ -191,7 +194,10 @@ const App = () => {
   const [bookingStep, setBookingStep] = useState(1); 
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'India' });
+  const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'in' }); // Default country India
+  const [customerLookupStatus, setCustomerLookupStatus] = useState('idle'); // 'idle' | 'searching' | 'found' | 'not-found'
+  const [isReturningCustomer, setIsReturningCustomer] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
   const [paymentStatus, setPaymentStatus] = useState('idle');
   const [paymentConfig, setPaymentConfig] = useState(getPaymentConfig()); 
   const paypalRef = useRef(null);
@@ -206,10 +212,8 @@ const App = () => {
 
   // --- Effects ---
   useEffect(() => {
-    // 2. Perform Async check to refine location
     const refineLocation = async () => {
        const refinedConfig = await getPaymentConfigAsync();
-       // Only update if it actually changed to avoid re-renders
        setPaymentConfig(prev => (prev.currency !== refinedConfig.currency ? refinedConfig : prev));
     };
     refineLocation();
@@ -252,16 +256,14 @@ const App = () => {
     setIsMenuOpen(false);
     
     // Separate pages
-    if (id === 'about' || id === 'experience') {
+    if (id === 'about' || id === 'experience' || id === 'faq') {
       setActivePage(id);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    // Home Page & Sections (Services, Testimonials, Contact)
     if (activePage !== 'home') {
       setActivePage('home');
-      // Wait for render then scroll
       setTimeout(() => {
         const element = document.getElementById(id);
         if (element) element.scrollIntoView({ behavior: 'smooth' });
@@ -272,6 +274,112 @@ const App = () => {
       if (element) element.scrollIntoView({ behavior: 'smooth' });
       else window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  };
+
+  // --- Customer Database Logic ---
+  const checkCustomer = async () => {
+    // Basic length check for international numbers (min 7 digits)
+    if (!bookingDetails.phone || bookingDetails.phone.length < 7) {
+        setValidationErrors(prev => ({ ...prev, phone: "Please enter a valid phone number" }));
+        return;
+    }
+    setValidationErrors(prev => ({ ...prev, phone: null }));
+    setCustomerLookupStatus('searching');
+
+    if (isDemoMode) {
+        setTimeout(() => {
+            setCustomerLookupStatus('not-found');
+            setIsReturningCustomer(false);
+        }, 1000);
+        return;
+    }
+
+    try {
+        let collectionRef;
+        if (typeof __app_id !== 'undefined') {
+            collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'customers');
+        } else {
+            collectionRef = collection(db, 'customers');
+        }
+
+        const q = query(collectionRef, where('phone', '==', bookingDetails.phone));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            const customerData = querySnapshot.docs[0].data();
+            // Store details in state but DON'T display in inputs (isReturningCustomer = true hides fields)
+            setBookingDetails(prev => ({
+                ...prev,
+                name: customerData.name || '',
+                email: customerData.email || '',
+                country: customerData.country || 'in'
+            }));
+            setCustomerLookupStatus('found');
+            setIsReturningCustomer(true);
+        } else {
+            setCustomerLookupStatus('not-found');
+            setIsReturningCustomer(false);
+        }
+    } catch (e) {
+        console.error("Error looking up customer", e);
+        setCustomerLookupStatus('not-found');
+        setIsReturningCustomer(false);
+    }
+  };
+
+  const validateInputs = () => {
+      const errors = {};
+      if (!bookingDetails.phone || bookingDetails.phone.length < 8) errors.phone = "Invalid phone number";
+      
+      if (!isReturningCustomer) {
+          if (!bookingDetails.name || bookingDetails.name.trim().length < 2) errors.name = "Name is required";
+          if (!bookingDetails.email || !isEmail(bookingDetails.email)) errors.email = "Valid email is required";
+      }
+      
+      setValidationErrors(errors);
+      return Object.keys(errors).length === 0;
+  };
+
+  const saveCustomer = async () => {
+    if (isDemoMode || !db) return;
+
+    try {
+        let collectionRef;
+        if (typeof __app_id !== 'undefined') {
+            collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'customers');
+        } else {
+            collectionRef = collection(db, 'customers');
+        }
+
+        const q = query(collectionRef, where('phone', '==', bookingDetails.phone));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            // Update timestamp only
+            const docRef = querySnapshot.docs[0].ref;
+            await updateDoc(docRef, {
+                lastBooking: serverTimestamp()
+            });
+        } else {
+            // Create new
+            await addDoc(collectionRef, {
+                phone: bookingDetails.phone,
+                name: bookingDetails.name,
+                email: bookingDetails.email,
+                country: bookingDetails.country,
+                createdAt: serverTimestamp(),
+                lastBooking: serverTimestamp()
+            });
+        }
+    } catch (e) {
+        console.error("Failed to save customer data", e);
+    }
+  };
+
+  const handleProceedToPayment = async () => {
+      if (!validateInputs()) return;
+      await saveCustomer();
+      setBookingStep(3);
   };
 
   const handleAdminLogin = (e) => {
@@ -356,7 +464,6 @@ const App = () => {
       setTimeout(() => setReviewStatus('idle'), 2000);
     } catch (error) {
       logError(error, { context: 'Post Review' });
-      // Fallback: If DB fails or times out, optimistically add to UI for this session
       const mockReview = { 
          name: newReview.anonymous ? "Anonymous" : newReview.name,
          text: newReview.text,
@@ -464,7 +571,10 @@ const App = () => {
     setSelectedDate(null);
     setSelectedSlot(null);
     setBookingDetails({ name: '', email: '', phone: '', country: 'India' });
+    setCustomerLookupStatus('idle');
+    setIsReturningCustomer(false);
     setPaymentStatus('idle');
+    setValidationErrors({});
   };
 
   const generateDates = () => {
@@ -490,6 +600,7 @@ const App = () => {
     { name: 'Home', id: 'home' }, { name: 'About', id: 'about' },
     { name: 'Experience', id: 'experience' },
     { name: 'Services', id: 'services' }, { name: 'Testimonials', id: 'testimonials' },
+    { name: 'FAQ', id: 'faq' },
     { name: 'Contact', id: 'contact' },
   ];
 
@@ -504,6 +615,14 @@ const App = () => {
     { role: "Psychological Counsellor", org: "Allen Career Institute, Kota", period: "Sep 2023 - Sep 2024", desc: "Delivered 200+ counselling sessions for high-pressure students." },
     { role: "Counselling Psychologist", org: "Ujala Centre, RNT Medical College", period: "Feb 2023 - Present", desc: "Providing therapy for children with special needs (ADHD, ID, LD)." },
     { role: "Volunteer Psychologist", org: "Student Care Alliance Society", period: "May 2024 - Sep 2024", desc: "Conducted 450+ individual and group sessions with aspirants." }
+  ];
+
+  const faqs = [
+    { q: "How long is each counselling session?", a: "Standard individual sessions typically last for 50-60 minutes. Initial consultations may be slightly longer to gather comprehensive history." },
+    { q: "Is my information kept confidential?", a: "Absolutely. Confidentiality is a cornerstone of therapy. Your information is never shared without your consent, except in rare legal circumstances or if there is an immediate risk of harm." },
+    { q: "Do you offer online sessions?", a: "Yes, I offer secure online video consultations for clients who prefer to meet remotely or are located outside of Indore." },
+    { q: "What is your cancellation policy?", a: "I request at least 24 hours' notice for cancellations. Missed appointments without prior notice may be subject to a cancellation fee." },
+    { q: "How do I know if therapy is right for me?", a: "Therapy provides a safe space to explore feelings and develop coping strategies. If you're feeling overwhelmed, stuck, or just want to understand yourself better, therapy can be very beneficial." }
   ];
 
   useEffect(() => {
@@ -728,6 +847,28 @@ const App = () => {
     </section>
   );
 
+  const FAQPage = () => (
+    <section className="pt-32 pb-20 px-6 bg-white min-h-screen animate-fade-in">
+        <div className="container mx-auto max-w-3xl">
+            <div className="text-center mb-16 space-y-4">
+                <h2 className="text-3xl md:text-4xl font-bold text-slate-800">Frequently Asked Questions</h2>
+                <div className="w-20 h-1.5 bg-teal-500 mx-auto rounded-full"></div>
+            </div>
+            <div className="space-y-6">
+                {faqs.map((faq, i) => (
+                    <div key={i} className="border border-stone-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+                        <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                           <HelpCircle className="w-5 h-5 text-teal-600" />
+                           {faq.q}
+                        </h3>
+                        <p className="text-slate-600 leading-relaxed ml-7">{faq.a}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    </section>
+  );
+
   return (
     <div className="min-h-screen bg-stone-50 text-slate-800 font-sans selection:bg-teal-100 relative">
       <TrackingManager />
@@ -853,24 +994,86 @@ const App = () => {
             </div>
           )}
           {bookingStep === 2 && (
-            <div className="space-y-4">
-              <input type="text" placeholder="Full Name *" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.name} onChange={e => setBookingDetails({...bookingDetails, name: e.target.value})} />
-              <input type="email" placeholder="Email *" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.email} onChange={e => setBookingDetails({...bookingDetails, email: e.target.value})} />
-              <input type="tel" placeholder="Phone *" className="w-full px-4 py-2 border rounded-lg" value={bookingDetails.phone} onChange={e => setBookingDetails({...bookingDetails, phone: e.target.value})} />
-              
-              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-800 flex items-start gap-2">
-                 <Globe size={16} className="mt-0.5 flex-shrink-0" />
-                 <div>
-                    <span className="font-semibold">Detected Region:</span> {paymentConfig?.isIndia ? 'India' : 'International'}
+            <div className="space-y-6">
+              {/* Phone Input with Country Code */}
+              <div className="space-y-1">
+                 <label className="text-sm font-medium text-slate-700">Mobile Number *</label>
+                 <div className="flex gap-2">
+                   <div className="flex-1">
+                     <PhoneInput
+                       country={'in'}
+                       value={bookingDetails.phone}
+                       onChange={(phone, country) => setBookingDetails({...bookingDetails, phone, country: country.name})}
+                       inputClass="!w-full !py-2.5 !h-11 !text-base !rounded-lg !border-stone-200 !font-sans"
+                       buttonClass="!bg-white !border-stone-200 !rounded-l-lg"
+                       dropdownClass="!shadow-xl !rounded-lg"
+                       disabled={customerLookupStatus === 'found'}
+                     />
+                   </div>
+                   <button 
+                      onClick={checkCustomer} 
+                      disabled={!bookingDetails.phone || bookingDetails.phone.length < 5 || customerLookupStatus === 'searching' || customerLookupStatus === 'found'}
+                      className="bg-slate-800 text-white px-4 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                   >
+                      {customerLookupStatus === 'searching' ? <Loader className="animate-spin w-4 h-4"/> : 'Verify'}
+                   </button>
                  </div>
+                 {validationErrors.phone && <p className="text-red-500 text-xs mt-1">{validationErrors.phone}</p>}
               </div>
+              
+              {/* Customer Found State - Hidden Details */}
+              {customerLookupStatus === 'found' && (
+                  <div className="bg-green-50 border border-green-100 p-4 rounded-lg flex flex-col gap-2 animate-fade-in">
+                      <div className="flex items-center gap-2 text-green-700 font-medium">
+                        <CheckCircle className="w-5 h-5"/> 
+                        <span>Welcome back!</span>
+                      </div>
+                      <p className="text-sm text-green-600">We have retrieved your details securely. You can proceed to payment.</p>
+                      <button onClick={() => { setCustomerLookupStatus('idle'); setIsReturningCustomer(false); setBookingDetails(prev => ({...prev, name: '', email: ''})); }} className="text-xs text-slate-500 underline text-left mt-1 hover:text-slate-700">Not you? Enter details manually</button>
+                  </div>
+              )}
 
-              <div className="flex justify-between pt-4">
-                <button onClick={() => setBookingStep(1)}>Back</button>
+              {/* New Customer State - Input Fields */}
+              {(!isReturningCustomer && customerLookupStatus !== 'searching') && (
+                <div className={`space-y-4 animate-fade-in ${customerLookupStatus === 'idle' ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                  {customerLookupStatus === 'idle' && <div className="text-xs text-center text-slate-400 -mb-2">Verify mobile number to proceed</div>}
+                  
+                  {customerLookupStatus === 'not-found' && (
+                    <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg flex items-center gap-2 mb-2">
+                        <Info className="w-4 h-4 flex-shrink-0"/> Looks like you're new here. Please enter your details.
+                    </div>
+                  )}
+
+                  <div>
+                    <input 
+                      type="text" 
+                      placeholder="Full Name *" 
+                      className={`w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all ${validationErrors.name ? 'border-red-300' : 'border-stone-200'}`}
+                      value={bookingDetails.name} 
+                      onChange={e => setBookingDetails({...bookingDetails, name: e.target.value})} 
+                    />
+                    {validationErrors.name && <p className="text-red-500 text-xs mt-1">{validationErrors.name}</p>}
+                  </div>
+
+                  <div>
+                    <input 
+                      type="email" 
+                      placeholder="Email Address *" 
+                      className={`w-full px-4 py-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all ${validationErrors.email ? 'border-red-300' : 'border-stone-200'}`}
+                      value={bookingDetails.email} 
+                      onChange={e => setBookingDetails({...bookingDetails, email: e.target.value})} 
+                    />
+                    {validationErrors.email && <p className="text-red-500 text-xs mt-1">{validationErrors.email}</p>}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between pt-4 border-t border-stone-100">
+                <button onClick={() => setBookingStep(1)} className="text-slate-500 hover:text-slate-800 font-medium transition-colors">Back</button>
                 <button 
-                  disabled={!bookingDetails.name || !bookingDetails.email || !bookingDetails.phone}
-                  onClick={() => setBookingStep(3)} 
-                  className="bg-teal-600 text-white px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={customerLookupStatus === 'idle' || customerLookupStatus === 'searching'}
+                  onClick={handleProceedToPayment} 
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-8 py-2.5 rounded-lg font-bold shadow-lg shadow-teal-200 disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed transition-all"
                 >
                   Proceed
                 </button>
@@ -977,6 +1180,7 @@ const App = () => {
       {activePage === 'home' && <HomePage />}
       {activePage === 'about' && <AboutPage />}
       {activePage === 'experience' && <ExperiencePage />}
+      {activePage === 'faq' && <FAQPage />}
 
       {/* Footer */}
       <footer className="bg-slate-950 text-slate-400 py-8 border-t border-slate-900">
