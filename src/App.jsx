@@ -522,6 +522,8 @@ const App = () => {
   const [bookingStep, setBookingStep] = useState(1); 
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'in' }); 
   const [customerLookupStatus, setCustomerLookupStatus] = useState('idle'); 
   const [isReturningCustomer, setIsReturningCustomer] = useState(false);
@@ -578,6 +580,53 @@ const App = () => {
       }
     }
   }, [activeModal, bookingStep, paymentConfig]);
+
+  // Fetch available slots when date is selected
+  useEffect(() => {
+    const fetchAvailableSlots = async () => {
+      if (!selectedDate) {
+        setAvailableSlots([]);
+        return;
+      }
+
+      setSlotsLoading(true);
+      try {
+        // Format date in local timezone (YYYY-MM-DD) to avoid UTC conversion issues
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        const response = await fetch(`/api/calendar?date=${dateStr}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableSlots(data.slots || []);
+        } else {
+          // Fallback: all slots available
+          const defaultSlots = [
+            "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+            "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
+            "05:00 PM", "06:00 PM", "07:00 PM"
+          ];
+          setAvailableSlots(defaultSlots.map(time => ({ time, available: true })));
+        }
+      } catch (error) {
+        console.warn('Failed to fetch slots:', error);
+        // Fallback: all slots available
+        const defaultSlots = [
+          "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+          "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
+          "05:00 PM", "06:00 PM", "07:00 PM"
+        ];
+        setAvailableSlots(defaultSlots.map(time => ({ time, available: true })));
+      } finally {
+        setSlotsLoading(false);
+      }
+    };
+
+    fetchAvailableSlots();
+  }, [selectedDate]);
 
   // --- Navigation Logic ---
   const handleNavClick = (id) => {
@@ -859,21 +908,27 @@ const App = () => {
         provider: paymentConfig.provider
     });
     
-    if (import.meta.env.PROD) {
-      try {
-        await fetch('/api/book', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                ...bookingDetails, 
-                date: selectedDate.toLocaleDateString(), 
-                slot: selectedSlot,
-                currency: paymentConfig.currency,
-                transactionId: details?.id || details?.razorpay_payment_id
-            })
-        });
-      } catch(e) { logError(e, { context: 'Booking API' }); }
-    }
+    // Format date in local timezone (YYYY-MM-DD) to avoid UTC conversion issues
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    const localDateStr = `${year}-${month}-${day}`;
+
+    try {
+      await fetch('/api/book', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              ...bookingDetails, 
+              date: localDateStr, // YYYY-MM-DD in local timezone
+              dateDisplay: selectedDate.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+              slot: selectedSlot,
+              currency: paymentConfig.currency,
+              amount: paymentConfig.amount,
+              transactionId: details?.id || details?.razorpay_payment_id
+          })
+      });
+    } catch(e) { logError(e, { context: 'Booking API' }); }
   };
 
   const handleRazorpayPayment = async () => {
@@ -881,6 +936,7 @@ const App = () => {
     const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
     if (!keyId) {
+      // try
         console.warn("VITE_RAZORPAY_KEY_ID not found. Running in Demo/Simulation mode.");
         await processDemoPayment(paymentConfig, bookingDetails);
         handlePaymentSuccess({ id: "demo_" + Date.now() });
@@ -985,13 +1041,7 @@ const App = () => {
     return dates;
   };
   
-  const timeSlots = [
-    "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", 
-    "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", 
-    "05:00 PM", "06:00 PM", "07:00 PM"
-  ];
-  
-  const isSlotAvailable = (date, slot) => (date.getDate() + slot.length) % 3 !== 0;
+  // Time slots are now fetched from /api/calendar based on Google Calendar availability
 
   const navLinks = [
     { name: 'Home', id: 'home' }, { name: 'About', id: 'about' },
@@ -1171,7 +1221,37 @@ const App = () => {
                   </button>
                 ))}
               </div>
-              {selectedDate && <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{timeSlots.map((slot, i) => (<button key={i} disabled={!isSlotAvailable(selectedDate, slot)} onClick={() => setSelectedSlot(slot)} className={`py-2 px-4 rounded-lg text-sm font-medium border ${selectedSlot === slot ? 'bg-teal-600 text-white' : 'bg-white border-stone-200'}`}>{slot}</button>))}</div>}
+              {selectedDate && (
+                <div>
+                  <h4 className="font-semibold text-slate-800 mb-3">Select Time</h4>
+                  {slotsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader className="w-6 h-6 animate-spin text-teal-600" />
+                      <span className="ml-2 text-slate-500">Checking availability...</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {availableSlots.map((slot, i) => (
+                        <button 
+                          key={i} 
+                          disabled={!slot.available} 
+                          onClick={() => setSelectedSlot(slot.time)} 
+                          className={`py-2 px-4 rounded-lg text-sm font-medium border transition-all ${
+                            selectedSlot === slot.time 
+                              ? 'bg-teal-600 text-white border-teal-600' 
+                              : slot.available 
+                                ? 'bg-white border-stone-200 hover:border-teal-300' 
+                                : 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed line-through'
+                          }`}
+                        >
+                          {slot.time}
+                          {!slot.available && <span className="block text-xs">Booked</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex justify-end pt-4"><button disabled={!selectedDate || !selectedSlot} onClick={() => setBookingStep(2)} className="bg-teal-600 disabled:bg-stone-300 text-white px-6 py-2.5 rounded-lg font-bold">Next</button></div>
             </div>
           )}

@@ -5,12 +5,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-      }
-    }
+    // Proxy is only needed when running 'yarn dev' and you have a separate API server
+    // When using 'yarn dev:vercel', Vercel handles the /api routes directly
+    // Removing proxy to avoid ECONNREFUSED errors when no API server is running
   }
 })
