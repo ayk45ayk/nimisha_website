@@ -15,7 +15,11 @@ import 'react-phone-input-2/lib/style.css';
 import isEmail from 'validator/lib/isEmail';
 import { getPaymentConfig, getPaymentConfigAsync, loadScript, processPayment as processDemoPayment } from './utils/payment.js';
 import TrackingManager from './components/TrackingManager.jsx';
-import { trackEvent, logError } from './lib/tracking.js';
+import { 
+  trackEvent, logError, trackWebsiteVisit, trackSectionView, trackCTAClick, 
+  trackExternalClick, trackPhoneClick, trackWhatsAppClick, trackBookingFunnel,
+  trackTestimonial, trackFAQ, trackModalOpen 
+} from './lib/tracking.js';
 
 // --- Error Boundary ---
 class ErrorBoundary extends React.Component {
@@ -188,7 +192,7 @@ const TestimonialsSection = ({ reviews, isAdmin, initiateDelete, hasBooked, hand
   </section>
 );
 
-const ContactSection = ({ handleSendMessage, formStatus }) => {
+const ContactSection = ({ handleSendMessage, formStatus, onWhatsAppClick, onReset }) => {
   // Use state to manage form fields
   const [formData, setFormData] = useState({
     name: '',
@@ -200,8 +204,7 @@ const ContactSection = ({ handleSendMessage, formStatus }) => {
   const onSubmit = (e) => {
     e.preventDefault();
     handleSendMessage(formData);
-    // Optionally clear form here or in handleSendMessage
-    setFormData({ name: '', phone: '', message: '' });
+    setFormData({ name: '', phone: '', country: 'in', message: '' });
   };
 
   return (
@@ -211,54 +214,87 @@ const ContactSection = ({ handleSendMessage, formStatus }) => {
             <div className="space-y-8">
               <div><h2 className="text-3xl md:text-4xl font-bold mb-4">Start Your Journey Today</h2><div className="w-20 h-1.5 bg-teal-500 rounded-full mb-6"></div><p className="text-slate-300 text-lg">Taking the first step towards mental wellness is a sign of strength. Reach out to schedule a consultation or for any inquiries.</p></div>
               <div className="space-y-6">
-                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Phone className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Call Me</h3><a href="tel:+918000401045" className="text-slate-300 hover:text-white transition-colors">+91-8000401045</a></div></div>
+                <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Phone className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Call Me</h3><a href="tel:+918000401045" onClick={() => trackPhoneClick()} className="text-slate-300 hover:text-white transition-colors">+91-8000401045</a></div></div>
                 <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><Mail className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Email Me</h3><a href="mailto:nimishakhandelwal995@gmail.com" className="text-slate-300 hover:text-white transition-colors break-all">nimishakhandelwal995@gmail.com</a></div></div>
                 <div className="flex items-start gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700 hover:border-teal-500/50 transition-colors"><div className="bg-teal-600 p-3 rounded-lg"><MapPin className="w-6 h-6" /></div><div><h3 className="font-semibold text-lg">Location</h3><p className="text-slate-300">142 Royal Bungalow, Sukhliya<br />Indore, MP 42010</p></div></div>
               </div>
             </div>
             <div className="bg-white rounded-3xl p-8 text-slate-800 shadow-2xl">
-              <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
-              <form className="space-y-4" onSubmit={onSubmit}>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" 
-                    placeholder="John Doe" 
-                    required 
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  />
+              {formStatus === 'success' ? (
+                /* Success State with WhatsApp Option */
+                <div className="text-center py-6 animate-fade-in">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle className="w-8 h-8 text-green-600" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-800 mb-2">Message Sent!</h3>
+                  <p className="text-slate-600 mb-6">I'll get back to you soon via email or phone.</p>
+                  
+                  <div className="space-y-3">
+                    <p className="text-sm text-slate-500">Want a faster response?</p>
+                    <button 
+                      onClick={onWhatsAppClick}
+                      className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                      Chat on WhatsApp
+                    </button>
+                    <button 
+                      onClick={onReset}
+                      className="w-full text-slate-500 hover:text-slate-700 font-medium py-2 transition-colors"
+                    >
+                      Send another message
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
-                  <PhoneInput
-                    country={'in'}
-                    value={formData.phone}
-                    onChange={(phone, country) => setFormData({...formData, phone, country: country.name})}
-                    inputClass="!w-full !py-3 !h-12 !text-base !rounded-lg !border-stone-200 !bg-stone-50 !font-sans focus:!border-teal-500 focus:!ring-2 focus:!ring-teal-200"
-                    buttonClass="!bg-stone-50 !border-stone-200 !rounded-l-lg !h-12"
-                    dropdownClass="!shadow-xl !rounded-lg"
-                    containerClass="!w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
-                  <textarea 
-                    rows="4" 
-                    className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all resize-none" 
-                    placeholder="How can I help you?" 
-                    required
-                    value={formData.message}
-                    onChange={(e) => setFormData({...formData, message: e.target.value})}
-                  ></textarea>
-                </div>
-                <button type="submit" disabled={formStatus !== 'idle'} className={`w-full font-bold py-3.5 rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 ${formStatus === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}>
-                  {formStatus === 'idle' && "Send Message"}
-                  {formStatus === 'sending' && <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Sending...</>}
-                  {formStatus === 'success' && <><CheckCircle className="w-5 h-5" />Message Sent!</>}
-                </button>
-              </form>
+              ) : (
+                /* Form State */
+                <>
+                  <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
+                  <form className="space-y-4" onSubmit={onSubmit}>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Your Name</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all" 
+                        placeholder="John Doe" 
+                        required 
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+                      <PhoneInput
+                        country={'in'}
+                        value={formData.phone}
+                        onChange={(phone, country) => setFormData({...formData, phone, country: country.name})}
+                        inputClass="!w-full !py-3 !h-12 !text-base !rounded-lg !border-stone-200 !bg-stone-50 !font-sans focus:!border-teal-500 focus:!ring-2 focus:!ring-teal-200"
+                        buttonClass="!bg-stone-50 !border-stone-200 !rounded-l-lg !h-12"
+                        dropdownClass="!shadow-xl !rounded-lg"
+                        containerClass="!w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
+                      <textarea 
+                        rows="4" 
+                        className="w-full px-4 py-3 rounded-lg bg-stone-50 border border-stone-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all resize-none" 
+                        placeholder="How can I help you?" 
+                        required
+                        value={formData.message}
+                        onChange={(e) => setFormData({...formData, message: e.target.value})}
+                      ></textarea>
+                    </div>
+                    <button type="submit" disabled={formStatus === 'sending'} className="w-full font-bold py-3.5 rounded-lg shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white disabled:bg-teal-400">
+                      {formStatus === 'sending' ? (
+                        <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Sending...</>
+                      ) : (
+                        <><Send className="w-5 h-5" />Send Message</>
+                      )}
+                    </button>
+                  </form>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -567,6 +603,9 @@ const App = () => {
       setPaymentConfig(prev => (prev.currency !== refinedConfig.currency ? refinedConfig : prev));
     };
     refineLocation();
+    
+    // Track website visit on initial load
+    trackWebsiteVisit();
   }, []);
 
   useEffect(() => {
@@ -724,6 +763,7 @@ const App = () => {
     if (id === 'faq') {
       setActivePage('faq');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      trackFAQ.viewed();
       return;
     }
 
@@ -861,6 +901,7 @@ const App = () => {
   const handleProceedToPayment = async () => {
       if (!validateInputs()) return;
       await saveCustomer();
+      trackBookingFunnel.detailsFilled();
       setBookingStep(3);
   };
 
@@ -887,6 +928,7 @@ const App = () => {
       setCustomerLookupStatus('idle');
       setSkipVerification(false);
       setActiveModal('booking');
+      trackEvent('booking_started');
   };
 
   const handleAdminLogin = (e) => {
@@ -968,6 +1010,7 @@ const App = () => {
       
       setNewReview({ name: '', text: '', rating: 5, anonymous: false });
       setReviewStatus('success');
+      trackTestimonial.submitted(newReview.rating);
       setTimeout(() => setReviewStatus('idle'), 2000);
     } catch (error) {
       logError(error, { context: 'Post Review' });
@@ -1091,6 +1134,7 @@ const App = () => {
 
   const handleRazorpayPayment = async () => {
     setPaymentStatus('processing');
+    trackBookingFunnel.paymentInitiated('Razorpay', paymentConfig.amount);
     
     // Step 1: Check if slot is still available BEFORE payment
     const isAvailable = await checkSlotAvailability();
@@ -1162,6 +1206,7 @@ const App = () => {
             const errorDesc = response.error?.description || 'Payment was declined. Please try again.';
             setPaymentErrorMsg(errorDesc);
             setPaymentStatus('error');
+            trackBookingFunnel.paymentFailed('Razorpay', errorDesc);
         });
         rzp1.open();
     } catch (error) {
@@ -1172,39 +1217,53 @@ const App = () => {
     }
   };
 
+  const [lastContactForm, setLastContactForm] = useState(null);
+
   const handleSendMessage = async (formData) => {
     setFormStatus('sending');
+    setLastContactForm(formData); // Store for WhatsApp option
     
-    // 1. WhatsApp Message
-    const text = `Hello Nimisha, I have a query.%0A%0A*Name:* ${formData.name}%0A*Phone:* ${formData.phone}%0A*Message:* ${formData.message}`;
-    const whatsappUrl = `https://wa.me/918000401045?text=${text}`;
-    window.open(whatsappUrl, '_blank');
-
-    // 2. Email Notification (via Serverless Function)
-    if (import.meta.env.PROD) {
-      try {
-        const response = await fetch('/api/contact', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        });
-        
-        if (!response.ok) throw new Error('Email sending failed');
-        
-        trackEvent('contact_form_submit');
-      } catch (error) {
-        console.warn("Contact API error:", error);
-        // Continue to show success since WhatsApp likely worked
+    // Send Email Notification (Primary method - works silently in background)
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.warn("Email API error:", errorData);
+      } else {
+        console.log('✅ Email sent successfully');
       }
-    } else {
-      // Demo mode success simulation
-      console.log("Demo Mode: Email would be sent here", formData);
+      
+      trackEvent('contact_form_submit');
+    } catch (error) {
+      console.warn("Contact API error:", error);
     }
 
     setFormStatus('success');
-    setTimeout(() => { 
-        setFormStatus('idle'); 
-    }, 3000);
+    // Don't auto-reset - let user see the WhatsApp option
+  };
+
+  const handleWhatsAppFollowUp = () => {
+    if (lastContactForm) {
+      const text = `Hello Nimisha, I have a query.%0A%0A*Name:* ${lastContactForm.name}%0A*Phone:* ${lastContactForm.phone}%0A*Message:* ${lastContactForm.message}`;
+      window.open(`https://wa.me/918000401045?text=${text}`, '_blank');
+      // Track this specific action - user chose WhatsApp after sending email
+      trackEvent('whatsapp_followup_clicked', { 
+        source: 'contact_form_success',
+        had_message: true 
+      });
+    }
+    setFormStatus('idle');
+    setLastContactForm(null);
+  };
+
+  const resetContactForm = () => {
+    setFormStatus('idle');
+    setLastContactForm(null);
   };
 
   const resetBooking = () => {
@@ -1421,7 +1480,7 @@ const App = () => {
               <h4 className="font-semibold text-slate-800 mb-4">Select Date</h4>
               <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
                 {generateDates().map((date, i) => (
-                  <button key={i} onClick={() => { setSelectedDate(date); setSelectedSlot(null); }} className={`min-w-[80px] p-3 rounded-xl border transition-all flex flex-col items-center gap-1 ${selectedDate?.toDateString() === date.toDateString() ? 'bg-teal-600 text-white shadow-lg' : 'bg-white border-stone-200 hover:border-teal-300'}`}>
+                  <button key={i} onClick={() => { setSelectedDate(date); setSelectedSlot(null); trackBookingFunnel.dateSelected(date.toDateString()); }} className={`min-w-[80px] p-3 rounded-xl border transition-all flex flex-col items-center gap-1 ${selectedDate?.toDateString() === date.toDateString() ? 'bg-teal-600 text-white shadow-lg' : 'bg-white border-stone-200 hover:border-teal-300'}`}>
                     <span className="text-xs font-medium uppercase opacity-80">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
                     <span className="text-xl font-bold">{date.getDate()}</span>
                     <span className="text-xs opacity-70">{date.toLocaleDateString('en-US', { month: 'short' })}</span>
@@ -1442,7 +1501,7 @@ const App = () => {
                         <button 
                           key={i} 
                           disabled={!slot.available} 
-                          onClick={() => { setSelectedSlot(slot.time); setSlotConflictError(null); }} 
+                          onClick={() => { setSelectedSlot(slot.time); setSlotConflictError(null); trackBookingFunnel.slotSelected(slot.time); }} 
                           className={`py-2 px-4 rounded-lg text-sm font-medium border transition-all ${
                             selectedSlot === slot.time 
                               ? 'bg-teal-600 text-white border-teal-600' 
@@ -1776,7 +1835,12 @@ const App = () => {
               reviewStatus={reviewStatus} 
               openVerifyModal={openVerifyModal} 
           />
-          <ContactSection handleSendMessage={handleSendMessage} formStatus={formStatus} />
+          <ContactSection 
+            handleSendMessage={handleSendMessage} 
+            formStatus={formStatus} 
+            onWhatsAppClick={handleWhatsAppFollowUp}
+            onReset={resetContactForm}
+          />
         </>
       )}
 
