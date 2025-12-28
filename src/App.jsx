@@ -524,6 +524,7 @@ const App = () => {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [calendarCache, setCalendarCache] = useState({}); // Cache for all fetched availability
   const [bookingDetails, setBookingDetails] = useState({ name: '', email: '', phone: '', country: 'in' }); 
   const [customerLookupStatus, setCustomerLookupStatus] = useState('idle'); 
   const [isReturningCustomer, setIsReturningCustomer] = useState(false);
@@ -545,8 +546,25 @@ const App = () => {
   // --- Effects ---
   useEffect(() => {
     const refineLocation = async () => {
-       const refinedConfig = await getPaymentConfigAsync();
-       setPaymentConfig(prev => (prev.currency !== refinedConfig.currency ? refinedConfig : prev));
+      // Check for URL parameter to force PayPal mode (for testing)
+      const urlParams = new URLSearchParams(window.location.search);
+      const forcePayPal = urlParams.get('paypal') === 'true';
+      const forceRazorpay = urlParams.get('razorpay') === 'true';
+      
+      if (forcePayPal) {
+        console.log('🧪 TEST MODE: Forcing PayPal');
+        setPaymentConfig({ isIndia: false, currency: 'USD', amount: 30, provider: 'PayPal', symbol: '$', testMode: true });
+        return;
+      }
+      
+      if (forceRazorpay) {
+        console.log('🧪 TEST MODE: Forcing Razorpay');
+        setPaymentConfig({ isIndia: true, currency: 'INR', amount: 1500, provider: 'Razorpay', symbol: '₹', testMode: true });
+        return;
+      }
+      
+      const refinedConfig = await getPaymentConfigAsync();
+      setPaymentConfig(prev => (prev.currency !== refinedConfig.currency ? refinedConfig : prev));
     };
     refineLocation();
   }, []);
@@ -557,15 +575,53 @@ const App = () => {
         loadScript('https://checkout.razorpay.com/v1/checkout.js');
       }
       if (paymentConfig.provider === 'PayPal') {
-        const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'test'; 
+        const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID;
+        
+        if (!clientId) {
+          console.warn("VITE_PAYPAL_CLIENT_ID not found. PayPal buttons will not load.");
+          if (paypalRef.current) {
+            paypalRef.current.innerHTML = `
+              <div class="text-center py-4">
+                <p class="text-amber-600 text-sm">PayPal is not configured. Please contact support or try again later.</p>
+              </div>
+            `;
+          }
+          return;
+        }
+        
         loadScript(`https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD`).then(success => {
           if (success && window.paypal && paypalRef.current) {
             paypalRef.current.innerHTML = "";
             window.paypal.Buttons({
-              createOrder: (data, actions) => {
+              style: {
+                layout: 'vertical',
+                color: 'blue',
+                shape: 'rect',
+                label: 'pay'
+              },
+              createOrder: async (data, actions) => {
+                // Check slot availability BEFORE creating PayPal order
+                if (selectedDate && selectedSlot) {
+                  const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+                  try {
+                    const checkRes = await fetch(`/api/calendar/check?date=${dateStr}&slot=${encodeURIComponent(selectedSlot)}`);
+                    const checkData = await checkRes.json();
+                    if (!checkData.available) {
+                      setSlotConflictError(`The ${selectedSlot} slot has just been booked. Please select another time.`);
+                      setCalendarCache({});
+                      setSelectedSlot(null);
+                      setBookingStep(1);
+                      throw new Error('Slot no longer available');
+                    }
+                  } catch (e) {
+                    if (e.message === 'Slot no longer available') throw e;
+                    // If check fails, proceed anyway
+                  }
+                }
                 return actions.order.create({
                   purchase_units: [{
-                    amount: { value: paymentConfig.amount.toString() }
+                    amount: { value: paymentConfig.amount.toString() },
+                    description: 'Consultation Fee - Nimisha Khandelwal'
                   }]
                 });
               },
@@ -573,60 +629,92 @@ const App = () => {
                 return actions.order.capture().then((details) => {
                   handlePaymentSuccess(details);
                 });
+              },
+              onCancel: () => {
+                console.log('PayPal payment cancelled');
+                setPaymentStatus('idle');
+              },
+              onError: (err) => {
+                console.error('PayPal error:', err);
+                if (!err.message?.includes('Slot no longer available')) {
+                  setPaymentErrorMsg('PayPal payment failed. Please try again or use a different payment method.');
+                  setPaymentStatus('error');
+                }
               }
             }).render(paypalRef.current);
+          } else if (paypalRef.current) {
+            paypalRef.current.innerHTML = `
+              <div class="text-center py-4">
+                <p class="text-red-600 text-sm">Failed to load PayPal. Please refresh the page.</p>
+              </div>
+            `;
           }
         });
       }
     }
   }, [activeModal, bookingStep, paymentConfig]);
 
-  // Fetch available slots when date is selected
-  useEffect(() => {
-    const fetchAvailableSlots = async () => {
-      if (!selectedDate) {
-        setAvailableSlots([]);
-        return;
-      }
+  // Helper to format date as YYYY-MM-DD
+  const formatDateStr = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
+  // Fetch availability for all dates when booking modal opens (single API call)
+  useEffect(() => {
+    const fetchAllAvailability = async () => {
+      // Only fetch when booking modal is open and we don't have cached data
+      if (activeModal !== 'booking' || bookingStep !== 1) return;
+      if (Object.keys(calendarCache).length > 0) return; // Already cached
+      
       setSlotsLoading(true);
       try {
-        // Format date in local timezone (YYYY-MM-DD) to avoid UTC conversion issues
-        const year = selectedDate.getFullYear();
-        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-        const day = String(selectedDate.getDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
+        const today = new Date();
+        const startDateStr = formatDateStr(today);
         
-        const response = await fetch(`/api/calendar?date=${dateStr}`);
+        const response = await fetch(`/api/calendar?date=${startDateStr}&days=14`);
         
         if (response.ok) {
           const data = await response.json();
-          setAvailableSlots(data.slots || []);
+          setCalendarCache(data.availability || {});
+          console.log('📅 Fetched availability for 14 days');
         } else {
-          // Fallback: all slots available
-          const defaultSlots = [
-            "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-            "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
-            "05:00 PM", "06:00 PM", "07:00 PM"
-          ];
-          setAvailableSlots(defaultSlots.map(time => ({ time, available: true })));
+          console.warn('Failed to fetch calendar availability');
         }
       } catch (error) {
-        console.warn('Failed to fetch slots:', error);
-        // Fallback: all slots available
-        const defaultSlots = [
-          "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-          "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
-          "05:00 PM", "06:00 PM", "07:00 PM"
-        ];
-        setAvailableSlots(defaultSlots.map(time => ({ time, available: true })));
+        console.warn('Failed to fetch availability:', error);
       } finally {
         setSlotsLoading(false);
       }
     };
 
-    fetchAvailableSlots();
-  }, [selectedDate]);
+    fetchAllAvailability();
+  }, [activeModal, bookingStep, calendarCache]);
+
+  // Update available slots from cache when date is selected (instant, no API call)
+  useEffect(() => {
+    if (!selectedDate) {
+      setAvailableSlots([]);
+      return;
+    }
+
+    const dateStr = formatDateStr(selectedDate);
+    
+    // Check if we have cached data for this date
+    if (calendarCache[dateStr]) {
+      setAvailableSlots(calendarCache[dateStr]);
+    } else {
+      // Fallback: all slots available (for dates outside cache range)
+      const defaultSlots = [
+        "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+        "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM",
+        "05:00 PM", "06:00 PM", "07:00 PM"
+      ];
+      setAvailableSlots(defaultSlots.map(time => ({ time, available: true })));
+    }
+  }, [selectedDate, calendarCache]);
 
   // --- Navigation Logic ---
   const handleNavClick = (id) => {
@@ -897,16 +985,14 @@ const App = () => {
     }
   };
 
+  const [slotConflictError, setSlotConflictError] = useState(null);
+  const [processingStep, setProcessingStep] = useState(0); // 0: payment, 1: creating booking, 2: sending email, 3: done
+  const [paymentErrorMsg, setPaymentErrorMsg] = useState(null); // Store specific error message
+
   const handlePaymentSuccess = async (details) => {
-    setPaymentStatus('success');
-    setBookingStep(4);
-    setHasBooked(true); 
-    
-    trackEvent('booking_confirmed', {
-        value: paymentConfig.amount,
-        currency: paymentConfig.currency,
-        provider: paymentConfig.provider
-    });
+    // Show processing screen immediately
+    setBookingStep(5); // New step for processing
+    setProcessingStep(1); // Creating booking...
     
     // Format date in local timezone (YYYY-MM-DD) to avoid UTC conversion issues
     const year = selectedDate.getFullYear();
@@ -915,7 +1001,9 @@ const App = () => {
     const localDateStr = `${year}-${month}-${day}`;
 
     try {
-      await fetch('/api/book', {
+      setProcessingStep(2); // Confirming appointment...
+      
+      const response = await fetch('/api/book', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -928,30 +1016,120 @@ const App = () => {
               transactionId: details?.id || details?.razorpay_payment_id
           })
       });
-    } catch(e) { logError(e, { context: 'Booking API' }); }
+      
+      const data = await response.json();
+      
+      // Check if slot was already booked by someone else
+      if (response.status === 409 && data.error === 'SLOT_UNAVAILABLE') {
+        console.warn('Slot conflict detected:', data.message);
+        setSlotConflictError(data.message);
+        setPaymentStatus('idle');
+        setCalendarCache({}); // Clear cache to refresh availability
+        setSelectedSlot(null);
+        setProcessingStep(0);
+        setBookingStep(1); // Go back to slot selection
+        return;
+      }
+      
+      setProcessingStep(3); // Sending confirmation...
+      
+      // Small delay for visual feedback
+      await new Promise(r => setTimeout(r, 800));
+      
+      setProcessingStep(4); // Complete!
+      
+      // Another small delay before showing success
+      await new Promise(r => setTimeout(r, 500));
+      
+      // Success!
+      setPaymentStatus('success');
+      setBookingStep(4);
+      setHasBooked(true); 
+      setSlotConflictError(null);
+      setProcessingStep(0);
+      
+      trackEvent('booking_confirmed', {
+          value: paymentConfig.amount,
+          currency: paymentConfig.currency,
+          provider: paymentConfig.provider
+      });
+      
+    } catch(e) { 
+      logError(e, { context: 'Booking API' });
+      // Still show success (payment was completed, booking might have succeeded)
+      setProcessingStep(4);
+      await new Promise(r => setTimeout(r, 500));
+      setPaymentStatus('success');
+      setBookingStep(4);
+      setHasBooked(true);
+      setProcessingStep(0);
+    }
+  };
+
+  // Check slot availability BEFORE payment
+  const checkSlotAvailability = async () => {
+    const dateStr = formatDateStr(selectedDate);
+    
+    try {
+      const response = await fetch(`/api/calendar/check?date=${dateStr}&slot=${encodeURIComponent(selectedSlot)}`);
+      const data = await response.json();
+      
+      if (!data.available) {
+        setSlotConflictError(`The ${selectedSlot} slot has just been booked. Please select another time.`);
+        setCalendarCache({}); // Clear cache to refresh
+        setSelectedSlot(null);
+        setBookingStep(1);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.warn('Availability check failed, proceeding with payment:', error);
+      // If check fails, proceed anyway - the booking API has a final check
+      return true;
+    }
   };
 
   const handleRazorpayPayment = async () => {
     setPaymentStatus('processing');
+    
+    // Step 1: Check if slot is still available BEFORE payment
+    const isAvailable = await checkSlotAvailability();
+    if (!isAvailable) {
+      setPaymentStatus('idle');
+      return;
+    }
+    
     const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
     if (!keyId) {
-      // try
-        console.warn("VITE_RAZORPAY_KEY_ID not found. Running in Demo/Simulation mode.");
-        await processDemoPayment(paymentConfig, bookingDetails);
-        handlePaymentSuccess({ id: "demo_" + Date.now() });
-        return;
+      // Demo mode
+      console.warn("VITE_RAZORPAY_KEY_ID not found. Running in Demo/Simulation mode.");
+      await processDemoPayment(paymentConfig, bookingDetails);
+      handlePaymentSuccess({ id: "demo_" + Date.now() });
+      return;
     }
 
     try {
+        // Ensure Razorpay script is loaded
+        const scriptLoaded = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
+        if (!scriptLoaded || !window.Razorpay) {
+          throw new Error("Failed to load Razorpay SDK");
+        }
+
         const response = await fetch('/api/payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ amount: paymentConfig.amount, currency: paymentConfig.currency })
         });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Payment order creation failed");
+        }
+        
         const orderData = await response.json();
 
-        if (!orderData.id) throw new Error("Order creation failed");
+        if (!orderData.id) throw new Error("Order creation failed - no order ID");
 
         const options = {
             key: keyId,
@@ -970,14 +1148,26 @@ const App = () => {
             },
             theme: {
                 color: "#0d9488"
+            },
+            modal: {
+                ondismiss: function() {
+                    setPaymentStatus('idle');
+                }
             }
         };
 
         const rzp1 = new window.Razorpay(options);
+        rzp1.on('payment.failed', function (response) {
+            console.error('Razorpay payment failed:', response.error);
+            const errorDesc = response.error?.description || 'Payment was declined. Please try again.';
+            setPaymentErrorMsg(errorDesc);
+            setPaymentStatus('error');
+        });
         rzp1.open();
-        setPaymentStatus('idle');
     } catch (error) {
+        console.error('Razorpay error:', error);
         logError(error, { context: 'Razorpay Init' });
+        setPaymentErrorMsg(error.message || 'Failed to initialize payment. Please try again.');
         setPaymentStatus('error');
     }
   };
@@ -1028,12 +1218,16 @@ const App = () => {
     setPaymentStatus('idle');
     setValidationErrors({});
     setSkipVerification(false);
+    setCalendarCache({}); // Clear cache so fresh data is fetched next time
+    setSlotConflictError(null); // Clear any conflict errors
+    setProcessingStep(0);
+    setPaymentErrorMsg(null);
   };
 
   const generateDates = () => {
     const dates = [];
     const today = new Date();
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 30; i++) { // Show 30 days instead of 7
       const nextDate = new Date(today);
       nextDate.setDate(today.getDate() + i);
       dates.push(nextDate);
@@ -1047,8 +1241,8 @@ const App = () => {
     { name: 'Home', id: 'home' }, { name: 'About', id: 'about' },
     { name: 'Experience', id: 'experience' },
     { name: 'Services', id: 'services' }, { name: 'Testimonials', id: 'testimonials' },
-    { name: 'FAQ', id: 'faq' },
     { name: 'Contact', id: 'contact' },
+    { name: 'FAQ', id: 'faq' },
   ];
 
   return (
@@ -1213,11 +1407,24 @@ const App = () => {
 
           {bookingStep === 1 && (
             <div className="space-y-6">
+              {/* Slot Conflict Warning */}
+              {slotConflictError && (
+                <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg flex items-start gap-3 animate-fade-in">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-amber-800 font-medium">Slot No Longer Available</p>
+                    <p className="text-sm text-amber-700 mt-1">{slotConflictError}</p>
+                    <p className="text-sm text-amber-600 mt-2">Your payment has been processed. Please select another time slot.</p>
+                  </div>
+                </div>
+              )}
               <h4 className="font-semibold text-slate-800 mb-4">Select Date</h4>
               <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
                 {generateDates().map((date, i) => (
-                  <button key={i} onClick={() => { setSelectedDate(date); setSelectedSlot(null); }} className={`min-w-[80px] p-3 rounded-xl border transition-all flex flex-col items-center gap-1 ${selectedDate?.toDateString() === date.toDateString() ? 'bg-teal-600 text-white shadow-lg' : 'bg-white border-stone-200'}`}>
-                    <span className="text-xs font-medium uppercase opacity-80">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span><span className="text-xl font-bold">{date.getDate()}</span>
+                  <button key={i} onClick={() => { setSelectedDate(date); setSelectedSlot(null); }} className={`min-w-[80px] p-3 rounded-xl border transition-all flex flex-col items-center gap-1 ${selectedDate?.toDateString() === date.toDateString() ? 'bg-teal-600 text-white shadow-lg' : 'bg-white border-stone-200 hover:border-teal-300'}`}>
+                    <span className="text-xs font-medium uppercase opacity-80">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                    <span className="text-xl font-bold">{date.getDate()}</span>
+                    <span className="text-xs opacity-70">{date.toLocaleDateString('en-US', { month: 'short' })}</span>
                   </button>
                 ))}
               </div>
@@ -1235,7 +1442,7 @@ const App = () => {
                         <button 
                           key={i} 
                           disabled={!slot.available} 
-                          onClick={() => setSelectedSlot(slot.time)} 
+                          onClick={() => { setSelectedSlot(slot.time); setSlotConflictError(null); }} 
                           className={`py-2 px-4 rounded-lg text-sm font-medium border transition-all ${
                             selectedSlot === slot.time 
                               ? 'bg-teal-600 text-white border-teal-600' 
@@ -1344,6 +1551,12 @@ const App = () => {
           )}
           {bookingStep === 3 && (
             <div className="space-y-6 text-center animate-fade-in">
+              {/* Test Mode Indicator */}
+              {paymentConfig?.testMode && (
+                <div className="bg-amber-100 border border-amber-300 text-amber-800 px-4 py-2 rounded-lg text-sm font-medium">
+                  🧪 TEST MODE - Use sandbox credentials
+                </div>
+              )}
               <div className="mb-6">
                 <p className="text-slate-500 text-sm uppercase tracking-wide font-semibold">Total Amount</p>
                 <h3 className="text-4xl font-bold text-slate-900 mt-1">
@@ -1369,37 +1582,142 @@ const App = () => {
                 )}
               </div>
 
+              {/* Payment Error Message */}
+              {paymentStatus === 'error' && (
+                <div className="bg-red-50 border border-red-200 p-4 rounded-lg space-y-3 animate-fade-in">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <AlertTriangle className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-red-800 font-semibold">Payment Failed</p>
+                      <p className="text-sm text-red-600 mt-1">{paymentErrorMsg || 'Your payment could not be processed.'}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => { setPaymentStatus('idle'); setPaymentErrorMsg(null); }} 
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Try Again
+                    </button>
+                    <button 
+                      onClick={() => { setBookingStep(1); setPaymentStatus('idle'); setPaymentErrorMsg(null); }} 
+                      className="flex-1 bg-white border border-red-200 hover:bg-red-50 text-red-700 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Change Slot
+                    </button>
+                  </div>
+                  <p className="text-xs text-red-500 text-center">Need help? Contact us at +91-8000401045</p>
+                </div>
+              )}
+
               {/* Dynamic Payment Buttons */}
               <div className="pt-4">
                 {paymentConfig.provider === 'PayPal' ? (
-                   <div className="w-full">
+                   <div className="w-full space-y-4">
                       {/* PayPal Container */}
-                      <div ref={paypalRef} className="min-h-[150px] flex items-center justify-center">
-                         <div className="text-sm text-gray-400">Loading PayPal...</div>
+                      <div ref={paypalRef} className="min-h-[100px] flex items-center justify-center">
+                         <div className="flex items-center gap-2 text-sm text-gray-400">
+                           <Loader className="w-4 h-4 animate-spin" /> Loading PayPal...
+                         </div>
                       </div>
-                      <button onClick={() => setBookingStep(2)} className="mt-4 text-slate-500 font-medium hover:text-slate-700 text-sm">Back</button>
+                      <button onClick={() => setBookingStep(2)} className="w-full text-center text-slate-500 font-medium hover:text-slate-700 text-sm py-2">← Back</button>
                    </div>
                 ) : (
-                   <div className="flex justify-between items-center">
-                    <button onClick={() => setBookingStep(2)} className="text-slate-500 font-medium hover:text-slate-700">Back</button>
+                   <div className="space-y-4">
                     <button 
                       onClick={handleRazorpayPayment} 
                       disabled={paymentStatus === 'processing'} 
-                      className="w-full sm:w-auto px-8 py-3 rounded-lg font-bold shadow-lg transition-all flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                      className="w-full px-8 py-3 rounded-lg font-bold shadow-lg transition-all flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-blue-400"
                     >
-                      {paymentStatus === 'processing' ? <><Loader className="w-4 h-4 animate-spin"/> Processing...</> : "Pay with Razorpay"}
+                      {paymentStatus === 'processing' ? <><Loader className="w-4 h-4 animate-spin"/> Processing...</> : `Pay ₹${paymentConfig.amount} with Razorpay`}
                     </button>
+                    <button onClick={() => setBookingStep(2)} className="w-full text-center text-slate-500 font-medium hover:text-slate-700 text-sm py-2">← Back</button>
                   </div>
                 )}
               </div>
             </div>
           )}
+          {/* Processing State - After Payment, Before Success */}
+          {bookingStep === 5 && (
+            <div className="py-8 animate-fade-in">
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 mx-auto mb-4 relative">
+                  <div className="absolute inset-0 rounded-full border-4 border-teal-100"></div>
+                  <div className="absolute inset-0 rounded-full border-4 border-teal-600 border-t-transparent animate-spin"></div>
+                </div>
+                <h3 className="text-xl font-bold text-slate-800">Completing Your Booking</h3>
+                <p className="text-slate-500 text-sm mt-1">Please wait, do not close this window</p>
+              </div>
+              
+              {/* Progress Steps */}
+              <div className="space-y-3 max-w-xs mx-auto">
+                {[
+                  { step: 1, label: 'Payment received' },
+                  { step: 2, label: 'Creating appointment' },
+                  { step: 3, label: 'Sending confirmation email' },
+                  { step: 4, label: 'Booking complete' }
+                ].map(({ step, label }) => (
+                  <div key={step} className={`flex items-center gap-3 transition-all duration-300 ${processingStep >= step ? 'opacity-100' : 'opacity-40'}`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+                      processingStep > step 
+                        ? 'bg-green-500 text-white' 
+                        : processingStep === step 
+                          ? 'bg-teal-600 text-white' 
+                          : 'bg-slate-200 text-slate-400'
+                    }`}>
+                      {processingStep > step ? (
+                        <CheckCircle className="w-4 h-4" />
+                      ) : processingStep === step ? (
+                        <Loader className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <span className="text-xs">{step}</span>
+                      )}
+                    </div>
+                    <span className={`text-sm ${processingStep >= step ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="mt-8 max-w-xs mx-auto">
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-teal-500 to-teal-600 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${(processingStep / 4) * 100}%` }}
+                  />
+                </div>
+                <p className="text-center text-xs text-slate-400 mt-2">{Math.round((processingStep / 4) * 100)}% complete</p>
+              </div>
+            </div>
+          )}
+
           {bookingStep === 4 && (
-            <div className="text-center py-8">
-              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold mb-2">Confirmed!</h3>
-              <p>Email sent to {bookingDetails.email}</p>
-              <button onClick={resetBooking} className="mt-6 bg-slate-800 text-white px-6 py-2 rounded-lg">Done</button>
+            <div className="text-center py-8 animate-fade-in">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-10 h-10 text-green-500" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-800 mb-2">Booking Confirmed!</h3>
+              <p className="text-slate-600 mb-1">Your appointment has been scheduled</p>
+              <p className="text-sm text-slate-500">Confirmation email sent to <span className="font-medium text-slate-700">{bookingDetails.email}</span></p>
+              
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-6 text-left max-w-sm mx-auto">
+                <div className="flex items-center gap-2 text-slate-700 mb-2">
+                  <Calendar className="w-4 h-4 text-teal-600" />
+                  <span className="font-medium">{selectedDate?.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <Clock className="w-4 h-4 text-teal-600" />
+                  <span className="font-medium">{selectedSlot}</span>
+                </div>
+              </div>
+              
+              <button onClick={resetBooking} className="mt-6 bg-teal-600 hover:bg-teal-700 text-white px-8 py-3 rounded-lg font-bold transition-colors">
+                Done
+              </button>
             </div>
           )}
         </Modal>

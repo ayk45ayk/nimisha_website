@@ -99,45 +99,70 @@ const getCalendarClient = () => {
   return google.calendar({ version: 'v3', auth });
 };
 
-// Parse slot time string to Date object
+// Parse slot time string to ISO datetime with India timezone
 const parseSlotToDate = (dateStr, timeStr) => {
-  // Handle various date formats
-  let date;
-  
-  // Try parsing as ISO date first (YYYY-MM-DD)
-  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-    date = new Date(dateStr);
-  } 
-  // Handle locale date string (e.g., "12/29/2024" or "29/12/2024")
-  else if (dateStr.includes('/')) {
-    const parts = dateStr.split('/');
-    if (parts.length === 3) {
-      // Assume MM/DD/YYYY format (US locale)
-      const [month, day, year] = parts.map(Number);
-      date = new Date(year, month - 1, day);
+  // Validate date format (YYYY-MM-DD)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    console.error('Invalid date format:', dateStr, '- expected YYYY-MM-DD');
+    // Try to extract date if possible
+    const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      dateStr = match[0];
+    } else {
+      // Fallback to today in YYYY-MM-DD
+      const today = new Date();
+      dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     }
   }
-  // Fallback: try native Date parsing
-  else {
-    date = new Date(dateStr);
-  }
   
-  // Check if date is valid
-  if (isNaN(date.getTime())) {
-    console.error('Failed to parse date:', dateStr);
-    // Fallback to today
-    date = new Date();
-  }
-  
-  // Parse time
+  // Parse time (e.g., "04:00 PM")
   const [time, period] = timeStr.split(' ');
   let [hours, minutes] = time.split(':').map(Number);
   
   if (period === 'PM' && hours !== 12) hours += 12;
   if (period === 'AM' && hours === 12) hours = 0;
   
-  date.setHours(hours, minutes, 0, 0);
-  return date;
+  // Create ISO string with explicit India timezone offset (+05:30)
+  const h = String(hours).padStart(2, '0');
+  const m = String(minutes).padStart(2, '0');
+  const isoString = `${dateStr}T${h}:${m}:00+05:30`;
+  
+  console.log(`📅 Parsed slot: ${dateStr} ${timeStr} -> ${isoString}`);
+  
+  return new Date(isoString);
+};
+
+// Check if a slot is still available (real-time check before booking)
+const isSlotAvailable = async (calendar, calendarId, date, slot) => {
+  const startTime = parseSlotToDate(date, slot);
+  const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour
+  
+  try {
+    const response = await calendar.freebusy.query({
+      requestBody: {
+        timeMin: startTime.toISOString(),
+        timeMax: endTime.toISOString(),
+        timeZone: 'Asia/Kolkata',
+        items: [{ id: calendarId }],
+      },
+    });
+    
+    const busyTimes = response.data.calendars[calendarId]?.busy || [];
+    
+    // If there are any busy times in this slot, it's not available
+    if (busyTimes.length > 0) {
+      console.log(`⚠️ Slot ${slot} on ${date} is no longer available:`, busyTimes);
+      return false;
+    }
+    
+    console.log(`✅ Slot ${slot} on ${date} is still available`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error checking slot availability:', error.message);
+    // If we can't check, allow the booking to proceed (fail open)
+    // Google Calendar will reject the duplicate anyway
+    return true;
+  }
 };
 
 // Create Google Calendar Event
@@ -204,12 +229,25 @@ export default async function handler(req, res) {
   let calendarEventId = null;
   let calendarError = null;
 
-  // 1. Create Google Calendar Event (if configured)
+  // 1. Check slot availability and Create Google Calendar Event (if configured)
   if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY && process.env.GOOGLE_CALENDAR_ID) {
     try {
       const calendar = getCalendarClient();
       const calendarId = process.env.GOOGLE_CALENDAR_ID;
       
+      // CRITICAL: Real-time check to prevent double booking
+      const available = await isSlotAvailable(calendar, calendarId, date, slot);
+      
+      if (!available) {
+        console.log('❌ Slot already booked - rejecting booking request');
+        return res.status(409).json({
+          success: false,
+          error: 'SLOT_UNAVAILABLE',
+          message: `Sorry, the ${slot} slot on ${dateDisplay || date} has just been booked by another user. Please select a different time.`
+        });
+      }
+      
+      // Slot is available - proceed with booking
       const event = await createCalendarEvent(calendar, calendarId, {
         name, email, phone, date, slot
       });
