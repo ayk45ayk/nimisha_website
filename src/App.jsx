@@ -609,7 +609,7 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (activeModal === 'booking' && bookingStep === 3) {
+    if (activeModal === 'booking' && bookingStep === 3 && paymentConfig) {
       if (paymentConfig.provider === 'Razorpay') {
         loadScript('https://checkout.razorpay.com/v1/checkout.js');
       }
@@ -1166,12 +1166,12 @@ const App = () => {
             body: JSON.stringify({ amount: paymentConfig.amount, currency: paymentConfig.currency })
         });
         
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Payment order creation failed");
-        }
-        
         const orderData = await response.json();
+        
+        if (!response.ok) {
+          console.error('Payment API error:', orderData);
+          throw new Error(orderData.error || "Payment order creation failed. Please try again.");
+        }
 
         if (!orderData.id) throw new Error("Order creation failed - no order ID");
 
@@ -1195,7 +1195,9 @@ const App = () => {
             },
             modal: {
                 ondismiss: function() {
+                    console.log('Razorpay modal dismissed');
                     setPaymentStatus('idle');
+                    setPaymentErrorMsg(null);
                 }
             }
         };
@@ -1206,6 +1208,7 @@ const App = () => {
             const errorDesc = response.error?.description || 'Payment was declined. Please try again.';
             setPaymentErrorMsg(errorDesc);
             setPaymentStatus('error');
+            // Keep on step 3 - error UI is shown within step 3
             trackBookingFunnel.paymentFailed('Razorpay', errorDesc);
         });
         rzp1.open();
@@ -1214,6 +1217,7 @@ const App = () => {
         logError(error, { context: 'Razorpay Init' });
         setPaymentErrorMsg(error.message || 'Failed to initialize payment. Please try again.');
         setPaymentStatus('error');
+        // Keep on step 3 - error UI is shown within step 3
     }
   };
 
@@ -1610,8 +1614,16 @@ const App = () => {
           )}
           {bookingStep === 3 && (
             <div className="space-y-6 text-center animate-fade-in">
+              {/* Fallback if paymentConfig not ready */}
+              {!paymentConfig ? (
+                <div className="py-8 text-center">
+                  <Loader className="w-8 h-8 animate-spin text-teal-600 mx-auto mb-4" />
+                  <p className="text-slate-500">Loading payment options...</p>
+                </div>
+              ) : (
+              <>
               {/* Test Mode Indicator */}
-              {paymentConfig?.testMode && (
+              {paymentConfig.testMode && (
                 <div className="bg-amber-100 border border-amber-300 text-amber-800 px-4 py-2 rounded-lg text-sm font-medium">
                   🧪 TEST MODE - Use sandbox credentials
                 </div>
@@ -1619,7 +1631,7 @@ const App = () => {
               <div className="mb-6">
                 <p className="text-slate-500 text-sm uppercase tracking-wide font-semibold">Total Amount</p>
                 <h3 className="text-4xl font-bold text-slate-900 mt-1">
-                  {paymentConfig ? `${paymentConfig.symbol}${paymentConfig.amount}` : '...'}
+                  {`${paymentConfig.symbol}${paymentConfig.amount}`}
                 </h3>
               </div>
 
@@ -1673,7 +1685,7 @@ const App = () => {
 
               {/* Dynamic Payment Buttons */}
               <div className="pt-4">
-                {paymentConfig.provider === 'PayPal' ? (
+                {paymentConfig?.provider === 'PayPal' ? (
                    <div className="w-full space-y-4">
                       {/* PayPal Container */}
                       <div ref={paypalRef} className="min-h-[100px] flex items-center justify-center">
@@ -1690,12 +1702,14 @@ const App = () => {
                       disabled={paymentStatus === 'processing'} 
                       className="w-full px-8 py-3 rounded-lg font-bold shadow-lg transition-all flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-blue-400"
                     >
-                      {paymentStatus === 'processing' ? <><Loader className="w-4 h-4 animate-spin"/> Processing...</> : `Pay ₹${paymentConfig.amount} with Razorpay`}
+                      {paymentStatus === 'processing' ? <><Loader className="w-4 h-4 animate-spin"/> Processing...</> : `Pay ${paymentConfig?.symbol || '₹'}${paymentConfig?.amount || ''} with Razorpay`}
                     </button>
                     <button onClick={() => setBookingStep(2)} className="w-full text-center text-slate-500 font-medium hover:text-slate-700 text-sm py-2">← Back</button>
                   </div>
                 )}
               </div>
+              </>
+              )}
             </div>
           )}
           {/* Processing State - After Payment, Before Success */}
