@@ -16,9 +16,9 @@ import isEmail from 'validator/lib/isEmail';
 import { getPaymentConfig, getPaymentConfigAsync, loadScript, processPayment as processDemoPayment } from './utils/payment.js';
 import TrackingManager from './components/TrackingManager.jsx';
 import { 
-  trackEvent, logError, trackWebsiteVisit, trackSectionView, trackCTAClick, 
+  trackEvent, logError, trackWebsiteVisit, trackSectionView, trackCTAClick,
   trackExternalClick, trackPhoneClick, trackWhatsAppClick, trackBookingFunnel,
-  trackTestimonial, trackFAQ, trackModalOpen 
+  trackTestimonial, trackFAQ, trackModalOpen, trackSearch
 } from './lib/tracking.js';
 
 // --- Error Boundary ---
@@ -73,8 +73,8 @@ const HeroSection = ({ openBookingModal, handleNavClick, heroContent }) => (
           <h1 className="text-5xl font-bold text-slate-900">Compassionate Care for <span className="text-teal-600">Mental Wellness</span></h1>
           <p className="text-lg text-slate-600">Dedicated to empowering children, adolescents, and adults through evidence-based therapy.</p>
           <div className="flex gap-4">
-            <button onClick={openBookingModal} className="bg-teal-600 text-white px-8 py-3 rounded-full font-semibold shadow-lg">Book Appointment</button>
-            <button onClick={() => handleNavClick('services')} className="bg-white border text-slate-700 px-8 py-3 rounded-full font-semibold">View Services</button>
+            <button onClick={() => { trackCTAClick('Book Appointment', 'hero'); openBookingModal(); }} className="bg-teal-600 text-white px-8 py-3 rounded-full font-semibold shadow-lg">Book Appointment</button>
+            <button onClick={() => { trackCTAClick('View Services', 'hero'); handleNavClick('services'); }} className="bg-white border text-slate-700 px-8 py-3 rounded-full font-semibold">View Services</button>
           </div>
         </div>
         <div className="flex-1 relative">
@@ -408,8 +408,8 @@ const FAQPage = () => {
 
     return (
       <div className="border border-stone-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow bg-white">
-        <button 
-          onClick={() => setIsOpen(!isOpen)}
+        <button
+          onClick={() => { if (!isOpen) trackFAQ.questionExpanded(faq.q); setIsOpen(!isOpen); }}
           className="w-full flex items-center justify-between p-4 text-left focus:outline-none"
         >
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-3">
@@ -758,7 +758,8 @@ const App = () => {
   // --- Navigation Logic ---
   const handleNavClick = (id) => {
     setIsMenuOpen(false);
-    
+    trackSectionView(id);
+
     // Separate FAQ page logic
     if (id === 'faq') {
       setActivePage('faq');
@@ -923,11 +924,12 @@ const App = () => {
   };
 
   const openBookingModal = () => {
-      setBookingStep(1); 
+      setBookingStep(1);
       setBookingDetails({ name: '', email: '', phone: '', country: 'in' });
       setCustomerLookupStatus('idle');
       setSkipVerification(false);
       setActiveModal('booking');
+      trackModalOpen('booking');
       trackEvent('booking_started');
   };
 
@@ -1813,7 +1815,7 @@ const App = () => {
                 {l.name}
               </button>
             ))}
-            <button onClick={openBookingModal} className="bg-teal-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:shadow-lg">Book Appointment</button>
+            <button onClick={() => { trackCTAClick('Book Appointment', 'navbar'); openBookingModal(); }} className="bg-teal-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:shadow-lg">Book Appointment</button>
           </div>
           <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}><Menu /></button>
         </div>
@@ -1824,7 +1826,7 @@ const App = () => {
                 {l.name}
               </button>
             ))}
-            <button onClick={openBookingModal} className="bg-teal-600 text-white py-3 rounded-lg font-bold">Book Appointment</button>
+            <button onClick={() => { trackCTAClick('Book Appointment', 'mobile-menu'); openBookingModal(); }} className="bg-teal-600 text-white py-3 rounded-lg font-bold">Book Appointment</button>
           </div>
         )}
       </nav>
@@ -1864,9 +1866,9 @@ const App = () => {
           <div className="flex items-center justify-center gap-2 mb-4"><Brain className="w-6 h-6 text-teal-600" /><span className="text-lg font-bold text-white">Nimisha Khandelwal</span></div>
           <p className="text-sm mb-6 flex items-center justify-center gap-2">© {new Date().getFullYear()} Nimisha Khandelwal. All rights reserved.<button onClick={() => setActiveModal('adminLogin')} className="opacity-20 hover:opacity-100 transition-opacity"><Lock size={12} /></button></p>
           <div className="flex justify-center gap-6">
-            <a href="https://www.linkedin.com/in/nimisha-khandelwal" target="_blank" rel="noopener noreferrer" className="hover:text-teal-500 transition-colors">LinkedIn</a>
-            <button onClick={() => setActiveModal('privacy')} className="hover:text-teal-500 transition-colors">Privacy Policy</button>
-            <button onClick={() => setActiveModal('terms')} className="hover:text-teal-500 transition-colors">Terms of Service</button>
+            <a href="https://www.linkedin.com/in/nimisha-khandelwal" target="_blank" rel="noopener noreferrer" onClick={() => trackExternalClick('LinkedIn', 'https://www.linkedin.com/in/nimisha-khandelwal')} className="hover:text-teal-500 transition-colors">LinkedIn</a>
+            <button onClick={() => { trackModalOpen('privacy'); setActiveModal('privacy'); }} className="hover:text-teal-500 transition-colors">Privacy Policy</button>
+            <button onClick={() => { trackModalOpen('terms'); setActiveModal('terms'); }} className="hover:text-teal-500 transition-colors">Terms of Service</button>
           </div>
         </div>
       </footer>
