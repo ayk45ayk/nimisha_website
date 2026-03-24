@@ -66,8 +66,32 @@ const Modal = ({ title, children, icon: Icon, onClose, className = "" }) => (
 
 // --- Sub-Components (Defined Outside) ---
 
-const HeroSection = ({ openBookingModal, handleNavClick, heroContent }) => (
-  <section id="home" className="pt-32 pb-20 px-6 bg-stone-50 animate-fade-in min-h-screen flex flex-col justify-center">
+const heroSlides = [
+  { text: "Empowering youth through mental health support.", image: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&fit=crop&q=80&w=800" },
+  { text: "A safe space to heal, grow, and thrive.", image: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=800" },
+  { text: "Your mental health matters — take the first step.", image: "https://images.unsplash.com/photo-1516302752625-fcc3c50ae61f?auto=format&fit=crop&q=80&w=800" },
+  { text: "Building resilience, one conversation at a time.", image: "https://images.unsplash.com/photo-1544027993-37dbfe43562a?auto=format&fit=crop&q=80&w=800" },
+];
+
+const HeroSection = ({ openBookingModal, handleNavClick }) => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setCurrentSlide(prev => (prev + 1) % heroSlides.length);
+        setIsTransitioning(false);
+      }, 500);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const slide = heroSlides[currentSlide];
+
+  return (
+    <section id="home" className="pt-32 pb-20 px-6 bg-stone-50 animate-fade-in min-h-screen flex flex-col justify-center">
       <div className="container mx-auto flex flex-col md:flex-row items-center gap-12">
         <div className="flex-1 space-y-6">
           <h1 className="text-5xl font-bold text-slate-900">Compassionate Care for <span className="text-teal-600">Mental Wellness</span></h1>
@@ -77,15 +101,30 @@ const HeroSection = ({ openBookingModal, handleNavClick, heroContent }) => (
             <button onClick={() => { trackCTAClick('View Services', 'hero'); handleNavClick('services'); }} className="bg-white border text-slate-700 px-8 py-3 rounded-full font-semibold">View Services</button>
           </div>
         </div>
-        <div className="flex-1 relative">
-          <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl rotate-2">
-            <img src={heroContent.image} alt="Wellness" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-black/40 flex items-end p-8"><p className="text-white text-lg italic">"{heroContent.text}"</p></div>
+        <div className="flex-1 relative group">
+          <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl rotate-2 transition-all duration-500 ease-out group-hover:rotate-0 group-hover:scale-105 group-hover:shadow-3xl">
+            <img
+              src={slide.image}
+              alt="Wellness"
+              className={`w-full h-[400px] object-cover transition-all duration-500 ${isTransitioning ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`}
+            />
+            <div className="absolute inset-0 bg-black/40 flex items-end p-8 transition-opacity duration-500 group-hover:bg-black/30">
+              <p className={`text-white text-lg italic transition-all duration-500 ${isTransitioning ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>"{slide.text}"</p>
+            </div>
+          </div>
+          {/* Slide indicators */}
+          <div className="flex justify-center gap-2 mt-4 relative z-10">
+            {heroSlides.map((_, i) => (
+              <button key={i} onClick={() => { setIsTransitioning(true); setTimeout(() => { setCurrentSlide(i); setIsTransitioning(false); }, 300); }}
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${i === currentSlide ? 'bg-teal-600 w-6' : 'bg-stone-300 hover:bg-stone-400'}`}
+              />
+            ))}
           </div>
         </div>
       </div>
-  </section>
-);
+    </section>
+  );
+};
 
 const ServicesSection = () => {
   const services = [
@@ -573,11 +612,7 @@ const App = () => {
 
   const [newReview, setNewReview] = useState({ name: '', text: '', rating: 5, anonymous: false });
   const [reviewStatus, setReviewStatus] = useState('idle');
-  const [heroContent, setHeroContent] = useState({
-    text: "Empowering youth through mental health support.",
-    image: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&fit=crop&q=80&w=800",
-    blob1: "bg-teal-200/30", blob2: "bg-purple-200/30"
-  });
+  // Hero content is now managed inside HeroSection with auto-rotating slides
 
   // --- Effects ---
   useEffect(() => {
@@ -1836,7 +1871,7 @@ const App = () => {
         <FAQPage />
       ) : (
         <>
-          <HeroSection openBookingModal={openBookingModal} handleNavClick={handleNavClick} heroContent={heroContent} />
+          <HeroSection openBookingModal={openBookingModal} handleNavClick={handleNavClick} />
           <AboutSection />
           <ExperienceSection />
           <ServicesSection />
